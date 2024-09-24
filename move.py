@@ -131,10 +131,16 @@ class MoveMove(Move):
                 ]
         
         # Remove moves where it would be inserted behind itself. (this would do nothing, since the source is deleted afterwards)
+        # Note: Since swapping index n with index n+1 is the same as moving n in front of n+2, these are exluded also.
         moves = [
-            move for move in moves if 
-            (move[0][0] != move[1][0]) or          # Allow if not in same queue
-            (not (move[0][1] == (move[1][1] - 1))) # But not if the target is behind the source
+            move for move in moves if not # if NOT
+            (
+                (move[0][0] == move[1][0]) and             # On the same machine AND
+                (
+                    (move[1][1] == (move[0][1] + 1)) or    # Target is n+1
+                    (move[1][1] == (move[0][1] + 2))       # Target is n+2
+                )
+             )
         ]
         
         # Return instances

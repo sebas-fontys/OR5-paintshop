@@ -384,27 +384,27 @@ class Schedule:
 
 
 
-# # DEBUG
-# Construct an empty solution dictionary.
-schedule = Schedule()
+# # # DEBUG
+# # Construct an empty solution dictionary.
+# schedule = Schedule()
 
-import random as rng
-import numpy as np
+# import random as rng
+# import numpy as np
 
-# Create list of shuffled order ID's
-order_ids_remaining = PS.order_ids
-rng.shuffle(order_ids_remaining)
+# # Create list of shuffled order ID's
+# order_ids_remaining = PS.order_ids
+# rng.shuffle(order_ids_remaining)
 
-while len(order_ids_remaining) > 0:
+# while len(order_ids_remaining) > 0:
     
-    next_order_id_index = rng.choice(range(len(order_ids_remaining)))
+#     next_order_id_index = rng.choice(range(len(order_ids_remaining)))
     
-    schedule[rng.choice(PS.machine_ids), :] += [order_ids_remaining[next_order_id_index]]
+#     schedule[rng.choice(PS.machine_ids), :] += [order_ids_remaining[next_order_id_index]]
     
-    order_ids_remaining = np.delete(order_ids_remaining, next_order_id_index)
+#     order_ids_remaining = np.delete(order_ids_remaining, next_order_id_index)
     
-    schedule.calculate_penalties()
+#     schedule.calculate_penalties()
     
     
     
-print(schedule)
+# print(schedule)
