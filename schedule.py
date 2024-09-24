@@ -12,6 +12,12 @@ from paintshop import PaintShop
 PS = PaintShop()
 
 
+# Private funcs
+def to_red(string: str) -> str:
+    return f"\x1b[31m{string}\x1b[0m"
+
+def to_green(string: str) -> str:
+    return f"\x1b[32m{string}\x1b[0m"
 
 # SCHEDULE CLASS:
 # Represents a solution to the paintshop problem.
@@ -33,12 +39,29 @@ class Schedule:
             [] for _ in PS.machine_ids
         ]
         
+        # Order penalty by index in queue
+        self.penalties: dict[tuple[int, int], float] = {}
+        
     
     # EQUALITY OPERATOR
     def __eq__(self, other):
         
         # Two schedules are equal if (and only if) their queues are equal
         return self.queues == other.queues
+    
+    
+    # HASHING (needed for creating a set of schedules during validation)
+    def __hash__(self):
+        
+        # Lists cannot be hashed, tuples can however.
+        return hash(
+            '|'.join([
+                '-'.join([
+                    str(order) for order in queue
+                ])
+            for queue in self.queues
+            ])
+        )
     
         
     # INDEX GETTER
@@ -75,13 +98,56 @@ class Schedule:
     # STRING CONVERSION
     def __str__(self) -> str:
         
-        # return(str([self.get_cost_machine(machine_id) for machine_id in PS.machine_ids]))
-
+        self.calculate_penalties()
         
-        return f"""Cost: \t{self.get_cost():.2f}\n""" + '\n'.join([
-            f'M{machine_id + 1}: {self[machine_id, :]} ({self.get_cost_machine(machine_id):.2f}) ({len(self[machine_id, :])})' 
-            for machine_id in PS.machine_ids
+        # Determine machine strings
+        machine_strings = [f'M{machine_id + 1}: ' for machine_id in PS.machine_ids]
+        longest_ms = max([len(ms) for ms in machine_strings])
+        machine_strings_justed = [
+            f'{ms.ljust(longest_ms)}' for ms in machine_strings
+        ]
+        
+        # Determine queue strings
+        longest_order_id = len(str(max(PS.order_ids)))
+        longest_queue = max([len(queue) for queue in self.queues])
+        queue_strings_basic = [[str(id).rjust(longest_order_id) for id in queue] for queue in self.queues]
+        queue_string_lengths = [len('  '.join(qs)) for qs in queue_strings_basic]
+        
+        queue_strings_colored = [
+            '  '.join([(to_red(str) if (self.penalties[(mi,qi)] > 0) else to_green(str)) for qi, str in enumerate(queue)]) for mi, queue in enumerate(queue_strings_basic)
+        ]
+        # longest_qs = max([len(qs) for qs in queue_strings])
+        longest_queue_string_len = max(queue_string_lengths)
+        
+        queue_strings_justed = [
+            f'[ {qs + " "*(longest_queue_string_len - queue_string_lengths[mi])} ]' for mi, qs in enumerate(queue_strings_colored)
+        ]
+        
+        # Determine cost strings
+        cost_strings = [
+            f' {self.get_cost_machine(machine_id):.2f}' for machine_id in PS.machine_ids
+        ]
+        longest_cs = max([len(cs) for cs in cost_strings])
+        cost_strings_justed = [
+            f'{cs.ljust(longest_cs)}' for cs in cost_strings
+        ]
+        
+        # Determine cost % strings
+        cost_fracs = [
+            f' ({(self.get_cost_machine(machine_id) / self.get_cost() * 100):.0f}%)' for machine_id in PS.machine_ids
+        ]
+        
+        # Determine header
+        longest_queue = max([len(q) for q in self.queues])    
+        header = f'{" "*longest_ms}  {"  ".join([str(i).rjust(longest_order_id) for i in range(longest_queue)])}   {self.get_cost():.2f}'
+        # footer = f'{"Total cost:".ljust(longest_ms + longest_qs + 4)} {self.get_cost():.2f}'
+        
+        return '\n'.join([
+            header,
+            '\n'.join([machine_strings_justed[i] + queue_strings_justed[i] + cost_strings_justed[i] + cost_fracs[i] for i in PS.machine_ids]),
+            # footer
         ])
+
     
     # # Returns the solution in pandas.DataFrame form
     # def to_dataframe(self) -> pd.DataFrame:
@@ -235,6 +301,13 @@ class Schedule:
             
         return t
     
+    
+    # TODO improve this
+    def calculate_penalties(self) -> None:
+        self.get_cost()
+    
+    
+    
     # Get the cost for the machine with the given machine_id
     def get_cost_machine(self, machine_id):
         # Processing time when starting on the current order
@@ -245,7 +318,7 @@ class Schedule:
         total_penalty = 0
             
         # Iterate over orders in queue
-        for order_id in self.queues[machine_id]:
+        for queue_index, order_id in enumerate(self.queues[machine_id]):
             
             # Add processing time to current time
             t += PS.get_processing_time(order_id, machine_id)
@@ -253,8 +326,14 @@ class Schedule:
             # Add setup time
             t += PS.get_setup_time(last_order_id, order_id)
             
+            # Calculate penalty
+            penalty = PS.get_penalty(order_id, t)
+            
             # Add penalty to total_cost
-            total_penalty += PS.get_penalty(order_id, t)
+            total_penalty += penalty
+            
+            # Save penalty
+            self.penalties[(machine_id, queue_index)] = penalty
             
             # Update last order ID
             last_order_id = order_id
@@ -302,3 +381,27 @@ class Schedule:
 
 
 
+# # DEBUG
+# Construct an empty solution dictionary.
+schedule = Schedule()
+
+import random as rng
+import numpy as np
+
+# Create list of shuffled order ID's
+order_ids_remaining = PS.order_ids
+rng.shuffle(order_ids_remaining)
+
+while len(order_ids_remaining) > 0:
+    
+    next_order_id_index = rng.choice(range(len(order_ids_remaining)))
+    
+    schedule[rng.choice(PS.machine_ids), :] += [order_ids_remaining[next_order_id_index]]
+    
+    order_ids_remaining = np.delete(order_ids_remaining, next_order_id_index)
+    
+    schedule.calculate_penalties()
+    
+    
+    
+print(schedule)

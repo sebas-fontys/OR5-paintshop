@@ -41,6 +41,10 @@ class SwapMove(Move):
     def __init__(self, queue_indices: tuple[tuple[int, int], tuple[int, int]]):
         self.a = queue_indices[0]
         self.b = queue_indices[1]
+        
+    # STR
+    def __str__(self):
+        return f'swap-items: {self.a} <=> {self.b}'
     
     # Returns a swapped copy of the specified schedule.
     def get_moved(self, old: Schedule) -> Schedule:
@@ -80,6 +84,10 @@ class MoveMove(Move):
     def __init__(self, queue_indices: tuple[tuple[int, int], tuple[int, int]]):
         self.old_index = queue_indices[0]
         self.new_index = queue_indices[1]
+    
+    # STR
+    def __str__(self):
+        return f'move-item: {self.old_index} => {self.new_index}'
     
     # Returns a swapped copy of the specified schedule.
     def get_moved(self, old: Schedule) -> Schedule:
@@ -140,6 +148,12 @@ class SwapQueuesMove(Move):
     def __init__(self, move: tuple[int, int]):
         self.machine_a = move[0]
         self.machine_b = move[1]
+    
+    
+    # STR
+    def __str__(self):
+        return f'swap-queues: {self.machine_a} => {self.machine_b}'
+    
     
     def get_moved(self, old: Schedule) -> Schedule:
         

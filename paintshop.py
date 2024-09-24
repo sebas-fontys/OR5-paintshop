@@ -106,7 +106,6 @@ class PaintShop:
             t - self.orders.loc[order, 'deadline']
         )
     
-    
     def get_color_names(self) -> list[str]:
         return self.__color_names_by_id.values()
     
