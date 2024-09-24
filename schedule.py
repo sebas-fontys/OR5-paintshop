@@ -5,7 +5,6 @@ import itertools as iter
 import matplotlib.patches as patches
 import matplotlib.patches as mpatches
 from abc import ABC, abstractmethod
-import copy
 
 
 # Initialize PaintShop
@@ -33,6 +32,13 @@ class Schedule:
         self.queues = [
             [] for _ in PS.machine_ids
         ]
+        
+    
+    # EQUALITY OPERATOR
+    def __eq__(self, other):
+        
+        # Two schedules are equal if (and only if) their queues are equal
+        return self.queues == other.queues
     
         
     # INDEX GETTER
@@ -276,129 +282,23 @@ class Schedule:
         return total_penalty
     
     
-    # Returns a list of tuples containing the swaps
-    def get_swaps(self) -> list[(tuple[int, int], tuple[int, int])]:
+    # # Returns a list of all possible moves.
+    # def get_moves(self) -> list[Move]:
         
-        # Get all indices of the orders.
-        order_indices = [(machine_id, queue_index) for machine_id in PS.machine_ids for queue_index in range(len(self.queues[machine_id]))]
+    #     # Get all indices of the orders.
+    #     order_indices = [(machine_id, queue_index) for machine_id in PS.machine_ids for queue_index in range(len(self.queues[machine_id]))]
         
-        # Return all combinations of length 2.
-        return list(iter.combinations(order_indices, 2))
+    #     # Return all combinations of length 2.
+    #     return list(iter.combinations(order_indices, 2))
     
     
-    # Get item
-    def get_item(self, index: tuple[int, int]):
-        
-        return self.queues[index[0]][index[1]]
+    def is_last_in_queue(self, index: tuple[int, int]):
+        return index[1] == (len(self[index[0], :]) - 1)
     
-    
-    # Set item
-    def set_item(self, index, value):
-        self.queues[index[0]][index[1]] = value
-    
-    # Return a swapped copy of self
+    # Return a copy of self
     def get_copy(self):
         return copy.deepcopy(self)
 
-
-
-# Move (Abstract Base Class) (https://docs.python.org/3/library/abc.html)
-class Move(ABC):
-    
-    # As I'm still testing out abstract base classes, I'm raising an exception.
-    # Apparantly, this method can only be called by subclasses calling super.func()
-    @abstractmethod
-    def get_moved(self, schedule_old: Schedule) -> Schedule:
-        raise Exception("Abstract method used.")
-
-    # @abstractmethod
-    # def get_gain(self) -> float:
-    #     raise Exception("Abstract method used.")
-
-# Swap two orders by queue index.
-class SwapOrders(Move):
-    
-    def __init__(self, queue_index_1: tuple[int, int], queue_index_2: tuple[int, int]):
-        self.a = queue_index_1
-        self.b = queue_index_2
-    
-    # Returns a swapped copy of the specified schedule.
-    def get_moved(self, old: Schedule) -> Schedule:
-        
-        # Create copy of schedule
-        new = copy.deepcopy(self)
-        
-        # Apply swap to new
-        new[self.b] = old[self.a]
-        new[self.a] = old[self.b]
-        
-        # Return swapped copy
-        return new
-    
-    # # Get the change in cost resulting from this swap in a optimised way.
-    # def get_gain(self, s: Schedule):
-        
-    #     return 
-
-# Swap two orders by queue index.
-class MoveOrder(Move):
-    
-    def __init__(self, old_index: tuple[int, int], new_index: tuple[int, int]):
-        self.old_index = old_index
-        self.new_index = new_index
-    
-    # Returns a swapped copy of the specified schedule.
-    def get_moved(self, schedule_old: Schedule) -> Schedule:
-        
-        # Create copy of schedule
-        new = copy.deepcopy(schedule_old)
-        
-        # Apply move (little something i leared called 'slice assignment' and the 'del keyword')
-        new[self.new_index[0], self.new_index[1]:self.new_index[1]] = [schedule_old[self.old_index]]
-        del new[self.old_index]
-        
-        # Return swapped copy
-        return new
-
-# Swaps the queue of two machines.
-class SwapQueues(Move):
-    
-    def __init__(self, machine_index_a: int, machine_index_b: int):
-        self.machine_a = machine_index_a
-        self.machine_b = machine_index_b
-    
-    def get_moved(self, schedule_old: Schedule) -> Schedule:
-        
-        # Create copy of schedule
-        schedule_new = copy.deepcopy(schedule_old)
-        
-        # Apply move (swap two queues)
-        schedule_new[self.machine_a, :] = schedule_old[self.machine_b, :]
-        schedule_new[self.machine_b, :] = schedule_old[self.machine_a, :]
-        
-        # Return swapped copy
-        return schedule_new
-    
-    
-# class ShuffleEach(Move):
-    
-#     def get_moved(self, schedule_old: Schedule) -> Schedule:
-        
-#         # Create copy of schedule
-#         new = copy.deepcopy(schedule_old)
-        
-#         # Apply move (shuffle each queue)
-#         new[self.new_index[0], self.new_index[1]:self.new_index[1]] = [schedule_old[self.old_index]]
-#         del new[self.old_index]
-        
-#         # Return swapped copy
-#         return new
-        
-
-# ???
-Move.register(SwapOrders)
-Move.register(MoveOrder)
-Move.register(SwapQueues)
 
 
 
