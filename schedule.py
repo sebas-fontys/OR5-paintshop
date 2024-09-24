@@ -34,7 +34,7 @@ class Schedule:
             [] for _ in PS.machine_ids
         ]
     
-    
+        
     # INDEX GETTER
     def __getitem__(self, index: tuple[int, int]) -> list[int] | int:
         """Gets the order index at the specified queue index for the specified machine index.
@@ -69,9 +69,10 @@ class Schedule:
     # STRING CONVERSION
     def __str__(self) -> str:
         
-        return f"""Cost: \t{
-            self.get_cost():.2f
-        }\n""" + '\n'.join([
+        # return(str([self.get_cost_machine(machine_id) for machine_id in PS.machine_ids]))
+
+        
+        return f"""Cost: \t{self.get_cost():.2f}\n""" + '\n'.join([
             f'M{machine_id + 1}: {self[machine_id, :]} ({self.get_cost_machine(machine_id):.2f}) ({len(self[machine_id, :])})' 
             for machine_id in PS.machine_ids
         ])
@@ -298,7 +299,7 @@ class Schedule:
     # Return a swapped copy of self
     def get_copy(self):
         return copy.deepcopy(self)
-    
+
 
 
 # Move (Abstract Base Class) (https://docs.python.org/3/library/abc.html)
