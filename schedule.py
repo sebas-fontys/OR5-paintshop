@@ -19,6 +19,9 @@ def to_red(string: str) -> str:
 def to_green(string: str) -> str:
     return f"\x1b[32m{string}\x1b[0m"
 
+def to_yellow(string: str) -> str:
+    return f"\x1b[33m{string}\x1b[0m"
+
 # SCHEDULE CLASS:
 # Represents a solution to the paintshop problem.
 # This class internally stores the solution as a 2-level list.
@@ -139,7 +142,7 @@ class Schedule:
         
         # Determine header
         longest_queue = max([len(q) for q in self.queues])    
-        header = f'{" "*longest_ms}  {"  ".join([str(i).rjust(longest_order_id) for i in range(longest_queue)])}   {self.get_cost():.2f}'
+        header = f'{" "*longest_ms}  {"  ".join([str(i).rjust(longest_order_id) for i in range(longest_queue)])}   {to_yellow(f"{self.get_cost():.2f}")}'
         # footer = f'{"Total cost:".ljust(longest_ms + longest_qs + 4)} {self.get_cost():.2f}'
         
         return '\n'.join([
