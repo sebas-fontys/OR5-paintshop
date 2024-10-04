@@ -51,7 +51,7 @@ class PaintShop:
         
         
         # Fix orders table: encode colors and set index as order ID
-        self.order_ids = source["orders"].index.tolist()
+        self.order_ids: list[int] = source["orders"].index.tolist()
         self.orders = pd.DataFrame(
             {
                 "surface":  source["orders"]["Surface" ].values,
@@ -99,11 +99,11 @@ class PaintShop:
         
         return self.__setup_times.loc[order_old, order_new]
     
-    def get_penalty(self, order, t) -> float:
+    def get_penalty(self, order, t_done) -> float:
         
         return self.orders.loc[order, 'penalty'] * max(
             0, 
-            t - self.orders.loc[order, 'deadline']
+            t_done - self.orders.loc[order, 'deadline']
         )
     
     def get_color_names(self) -> list[str]:

@@ -9,7 +9,6 @@ from paintshop import PaintShop
 # CONSTANTS
 PS = PaintShop()
 
-
 # Move (Abstract Base Class) (https://docs.python.org/3/library/abc.html)
 class Move(ABC):
     
@@ -19,16 +18,16 @@ class Move(ABC):
     def get_moved(self, schedule_old: Schedule) -> Schedule:
         raise Exception("Abstract method used.")
     
-    @staticmethod
-    # @abstractmethod
-    def get_moves(schedule: Schedule): # -> list[Move]
+    # @staticmethod
+    # # @abstractmethod
+    # def get_moves(schedule: Schedule):
         
-        return [
-            *SwapMove.get_moves(schedule),
-            *MoveMove.get_moves(schedule),
-            *SwapQueuesMove.get_moves(schedule)
-        ]
-        # raise Exception("Abstract method used.")
+    #     return [
+    #         *SwapMove.get_moves(schedule),
+    #         *MoveMove.get_moves(schedule),
+    #         *SwapQueuesMove.get_moves(schedule)
+    #     ]
+    #     # raise Exception("Abstract method used.")
 
     # @abstractmethod
     # def get_gain(self) -> float:
@@ -44,7 +43,7 @@ class SwapMove(Move):
         
     # STR
     def __str__(self):
-        return f'swap-items: {self.a} <=> {self.b}'
+        return f'swap: {self.a} <=> {self.b}'
     
     # Returns a swapped copy of the specified schedule.
     def get_moved(self, old: Schedule) -> Schedule:
@@ -55,6 +54,13 @@ class SwapMove(Move):
         # Apply swap to new
         new[self.b] = old[self.a]
         new[self.a] = old[self.b]
+        
+        # Recalc penalties
+        if self.a[0] == self.b[0]:
+            new.calc_queue_cost_from(self.a[0], min(self.a[1], self.b[1]))
+        else:
+            new.calc_queue_cost_from(self.a[0], self.a[1])
+            new.calc_queue_cost_from(self.b[0], self.b[1])
         
         # Return swapped copy
         return new
@@ -82,12 +88,12 @@ class SwapMove(Move):
 class MoveMove(Move):
     
     def __init__(self, queue_indices: tuple[tuple[int, int], tuple[int, int]]):
-        self.old_index = queue_indices[0]
-        self.new_index = queue_indices[1]
+        self.a = queue_indices[0]
+        self.b = queue_indices[1]
     
     # STR
     def __str__(self):
-        return f'move-item: {self.old_index} => {self.new_index}'
+        return f'move: {self.a} => {self.b}'
     
     # Returns a swapped copy of the specified schedule.
     def get_moved(self, old: Schedule) -> Schedule:
@@ -96,9 +102,16 @@ class MoveMove(Move):
         new = old.get_copy()
         
         # Apply move (little something i leared called 'slice assignment' and the 'del keyword')
-        new[self.new_index[0], self.new_index[1]:self.new_index[1]] = [old[self.old_index]]
-        del new[self.old_index]
+        new[self.b[0], self.b[1]:self.b[1]] = [old[self.a]]
+        del new[self.a]
         
+        # Recalc penalties
+        if self.a[0] == self.b[0]:
+            new.calc_queue_cost_from(self.a[0], min(self.a[1], self.b[1]))
+        else:
+            new.calc_queue_cost_from(self.a[0], self.a[1])
+            new.calc_queue_cost_from(self.b[0], self.b[1])
+            
         # Return swapped copy
         return new
     
@@ -158,7 +171,7 @@ class SwapQueuesMove(Move):
     
     # STR
     def __str__(self):
-        return f'swap-queues: {self.machine_a} => {self.machine_b}'
+        return f'qswp: {self.machine_a} => {self.machine_b}'
     
     
     def get_moved(self, old: Schedule) -> Schedule:
@@ -170,31 +183,38 @@ class SwapQueuesMove(Move):
         new[self.machine_a, :] = old[self.machine_b, :]
         new[self.machine_b, :] = old[self.machine_a, :]
         
+        # Recalc penalties
+        new.calc_queue_cost_from(self.machine_a, 0)
+        new.calc_queue_cost_from(self.machine_b, 0)
+        
         # Return swapped copy
         return new
     
     
     @staticmethod
-    def get_moves(schedule: Schedule):
+    def get_moves():
         
         # Return all 2-item combinations of the machine ID's
         return [SwapQueuesMove(move) for move in list(iter.combinations(PS.machine_ids, 2))]
     
-    
-# class ShuffleEach(Move):
-    
-#     def get_moved(self, schedule_old: Schedule) -> Schedule:
+
+
+def get_moves(schedule: Schedule) -> list[Move]:
         
-#         # Create copy of schedule
-#         new = copy.deepcopy(schedule_old)
+    return [
+        *SwapMove.get_moves(schedule),
+        *MoveMove.get_moves(schedule),
+        *SwapQueuesMove.get_moves()
+    ]
+
+
+def get_moves(schedule: Schedule) -> list[Move]:
         
-#         # Apply move (shuffle each queue)
-#         new[self.new_index[0], self.new_index[1]:self.new_index[1]] = [schedule_old[self.old_index]]
-#         del new[self.old_index]
-        
-#         # Return swapped copy
-#         return new
-        
+    return [
+        *SwapMove.get_moves(schedule),
+        *MoveMove.get_moves(schedule),
+        *SwapQueuesMove.get_moves()
+    ]
 
 # ???
 Move.register(SwapMove)

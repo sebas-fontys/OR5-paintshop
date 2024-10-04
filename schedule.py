@@ -1,10 +1,8 @@
 # IMPORTS
 import copy
 import matplotlib.pyplot as plt
-import itertools as iter
 import matplotlib.patches as patches
 import matplotlib.patches as mpatches
-from abc import ABC, abstractmethod
 
 
 # Initialize PaintShop
@@ -12,7 +10,7 @@ from paintshop import PaintShop
 PS = PaintShop()
 
 
-# Private funcs
+# Utility funcions
 def to_red(string: str) -> str:
     return f"\x1b[31m{string}\x1b[0m"
 
@@ -21,6 +19,7 @@ def to_green(string: str) -> str:
 
 def to_yellow(string: str) -> str:
     return f"\x1b[33m{string}\x1b[0m"
+
 
 # SCHEDULE CLASS:
 # Represents a solution to the paintshop problem.
@@ -34,27 +33,36 @@ class Schedule:
     This class supports indexing and has many usefull functions such as draw(), get_cost() and get_copy().
     """
     
-    
     # CONSTRUCTOR
     def __init__(self):
         """Constructs an empty schedule."""
-        self.queues = [
+        self.__queues: list[list[int]] = [
             [] for _ in PS.machine_ids
         ]
         
-        # Order penalty by index in queue
-        self.penalties: dict[tuple[int, int], float] = {}
+        # The time at which the orders are completed by their queue-index.
+        self.__completion_times: dict[tuple[int, int], float] = {
+            (mi, -1): 0 for mi in PS.machine_ids
+        }
         
-    
+        # The penalty of the orders by their queue-index.
+        self.__cumulative_penalties: dict[tuple[int, int], float] = {
+            (mi, -1): 0 for mi in PS.machine_ids
+        }
+        
+        # Penalties by queue
+        self.queue_costs: list[float] = [
+            0 for _ in PS.machine_ids
+        ]
+        
     # EQUALITY OPERATOR
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         
         # Two schedules are equal if (and only if) their queues are equal
-        return self.queues == other.queues
-    
+        return self.__queues == other.__queues
     
     # HASHING (needed for creating a set of schedules during validation)
-    def __hash__(self):
+    def __hash__(self) -> int:
         
         # Lists cannot be hashed, tuples can however.
         return hash(
@@ -62,12 +70,11 @@ class Schedule:
                 '-'.join([
                     str(order) for order in queue
                 ])
-            for queue in self.queues
+            for queue in self.__queues
             ])
         )
     
-        
-    # INDEX GETTER
+    # INDEX GETTER (supports slicing)
     def __getitem__(self, index: tuple[int, int]) -> list[int] | int:
         """Gets the order index at the specified queue index for the specified machine index.
 
@@ -77,31 +84,29 @@ class Schedule:
         Returns:
             list[int] or int: The order index at the specified position in the schedule or the queue for the specified machine if the second index is a slice.
         """
-        return self.queues[index[0]][index[1]]
+        return self.__queues[index[0]][index[1]]
     
+    # INDEX SETTER (supports slicing for the second index)
+    def __setitem__(self, index: tuple[int, int], order: int) -> None:
+        self.__queues[index[0]][index[1]] = order
+        
+        # Check for slice, recalculate from start of slice
+        # This indices method ensures that it works with any slice ([-1:-1] for example)
+        if isinstance(index[1], slice):
+            index = (index[0], index[1].indices(len(self.__queues[index[0]]))[0])
+        
+        self.calc_queue_cost_from(index[0], index[1])
     
-    # INDEX SETTER
-    def __setitem__(self, index: tuple[int, int], queue: list[int] | int):
-        """Sets the queue for the machine with the specified machine-number
-
-        Args:
-            machine_id (int): The index of the machine.
-            queue (list[int]): The queue for the specified machine.
-        """
-        self.queues[index[0]][index[1]] = queue
-    
-    
-    # INDEX DELETION
+    # INDEX DELETION (can use slice, but not using negative number)
     def __delitem__(self, index: tuple[int, int]):
         
         # Set queue as two contatenated slices where the item at index is skipped.
-        self[index[0], :] = self[index[0], :index[1]] + self[index[0], (index[1]+1):]
-    
-    
+        # self[index[0], :] = self[index[0], :index[1]] + self[index[0], (index[1]+1):]
+        del self.__queues[index[0]][index[1]]
+        self.calc_queue_cost_from(index[0], index[1])
+        
     # STRING CONVERSION
     def __str__(self) -> str:
-        
-        self.calculate_penalties()
         
         # Determine machine strings
         machine_strings = [f'M{machine_id + 1}: ' for machine_id in PS.machine_ids]
@@ -112,23 +117,32 @@ class Schedule:
         
         # Determine queue strings
         longest_order_id = len(str(max(PS.order_ids)))
-        longest_queue = max([len(queue) for queue in self.queues])
-        queue_strings_basic = [[str(id).rjust(longest_order_id) for id in queue] for queue in self.queues]
+        longest_queue = max([len(queue) for queue in self.__queues])
+        queue_strings_basic = [[str(id).rjust(longest_order_id) for id in queue] for queue in self.__queues]
         queue_string_lengths = [len('  '.join(qs)) for qs in queue_strings_basic]
         
         queue_strings_colored = [
-            '  '.join([(to_red(str) if (self.penalties[(mi,qi)] > 0) else to_green(str)) for qi, str in enumerate(queue)]) for mi, queue in enumerate(queue_strings_basic)
+            '  '.join([
+                (
+                    to_red(str)
+                    if (
+                        # (qi > 0) &
+                        (self.__cumulative_penalties[(mi,qi)] > self.__cumulative_penalties[(mi,qi - 1)])
+                    ) else 
+                    to_green(str)
+                ) for qi, str in enumerate(queue)
+            ]) for mi, queue in enumerate(queue_strings_basic)
         ]
         # longest_qs = max([len(qs) for qs in queue_strings])
         longest_queue_string_len = max(queue_string_lengths)
         
         queue_strings_justed = [
-            f'[ {qs + " "*(longest_queue_string_len - queue_string_lengths[mi])} ]' for mi, qs in enumerate(queue_strings_colored)
+            f'| {qs + " "*(longest_queue_string_len - queue_string_lengths[mi])}  |' for mi, qs in enumerate(queue_strings_colored)
         ]
         
         # Determine cost strings
         cost_strings = [
-            f' {self.get_cost_machine(machine_id):.2f}' for machine_id in PS.machine_ids
+            f' {self.queue_costs[machine_id]:.2f}' for machine_id in PS.machine_ids
         ]
         longest_cs = max([len(cs) for cs in cost_strings])
         cost_strings_justed = [
@@ -137,12 +151,12 @@ class Schedule:
         
         # Determine cost % strings
         cost_fracs = [
-            f' ({(self.get_cost_machine(machine_id) / self.get_cost() * 100):.0f}%)' for machine_id in PS.machine_ids
+            (f' ({(self.queue_costs[machine_id] / self.cost * 100):.0f}%)' if self.cost > 0 else '') for machine_id in PS.machine_ids
         ]
         
         # Determine header
-        longest_queue = max([len(q) for q in self.queues])    
-        header = f'{" "*longest_ms}  {"  ".join([str(i).rjust(longest_order_id) for i in range(longest_queue)])}   {to_yellow(f"{self.get_cost():.2f}")}'
+        longest_queue = max([len(q) for q in self.__queues])    
+        header = f'{" "*longest_ms}| {"  ".join([str(i).rjust(longest_order_id) for i in range(longest_queue)])}  | {to_yellow(f"{self.cost:.2f}")} {"✔" if self.is_feasible() else "✘"}'
         # footer = f'{"Total cost:".ljust(longest_ms + longest_qs + 4)} {self.get_cost():.2f}'
         
         return '\n'.join([
@@ -152,99 +166,93 @@ class Schedule:
         ])
 
     
-    # # Returns the solution in pandas.DataFrame form
-    # def to_dataframe(self) -> pd.DataFrame:
-    #     """Returns the Solution converted to a pandas.DataFrame.
-
-    #     Returns:
-    #         pd.DataFrame: The Solution in dataframe form.
-    #     """
-        
-    #     return pd.DataFrame.from_dict(
-    #         self.order_queue,
-    #     ).rename(columns ={
-    #         machine_id: f"M{machine_id + 1}" 
-    #         for machine_id in machine_ids
-    #     })
+    # COST CALCULATION
+    def calc_cost(self):
+        for mi in PS.machine_ids:
+            self.calc_queue_cost_from(mi, 0)
     
-    # Returns information about the current machine schedules on the order level.
-    def get_machine_schedules(self) -> list[list[dict[str, float]]]:
-        """Returns information about the current machine schedules on the order level such as order-processing starting- and ending-times
-
-        Returns:
-            list[list[dict[str, float]]]: A list (index: machine ID) containing lists (index: order queue index) of dictionaries containing the following data on the order execution:
-            - "start": start time in time units since schedule start, 
-            - "duration": processing duration in time units, 
-            - "end": order processing completion time in time units since schedule start, 
-            - "order": the order ID,
-            - "cost": the penalty related to the deadline of the order.
-        """
+    # OPTIMISED COST CALCULATION
+    def calc_queue_cost_from(self, machine, first_change_index):
         
-        machine_schedules = [[] for _ in self.machine_ids]
+        # Get chached starting time   
+        t_start = self.__completion_times[(machine, first_change_index - 1)]
         
-        for machine_id in self.machine_ids:
+        # Get order before current index. (Can optimize since we only need the color)
+        order_prev = self.__queues[machine][first_change_index - 1] if first_change_index > 0 else None
+        
+        # Get current cumulative penalty for this queue
+        cumulative_penalty_prev = 0 if (order_prev is None) else self.__cumulative_penalties[(machine, first_change_index - 1)]
+        
+        # For each order at index change_index or higher:
+        for qi in range(first_change_index, len(self.__queues[machine])):
+           
+            # Localize order 
+            order = self.__queues[machine][qi]
             
-            t_current = 0
-            last_order_id = None
-        
-            for order_id in self.queues[machine_id]:
-                
-                if (last_order_id != None):
-                    t_current += PS.get_setup_time(last_order_id, order_id)
-                
-                processing_time = PS.orders.loc[order_id, "surface"] / PS.machine_speeds[machine_id]
-                machine_schedules[machine_id] += [{
-                    "start": t_current, 
-                    "duration": processing_time, 
-                    "end": t_current + processing_time, 
-                    "order": order_id,
-                    "cost": 0 
-                        if ((t_current + processing_time) > self.orders.loc[order_id, "deadline"]) 
-                        else (t_current + processing_time) * self.orders.loc[order_id, "penalty"]
-                }]
-                
-                t_current += processing_time
-                last_order_id = order_id
-                
-        return machine_schedules
+            # Get and set completion time
+            t_done = t_start + PS.get_processing_time(order, machine) + PS.get_setup_time(order_prev, order)
+            self.__completion_times[(machine, qi)] = t_done
+            
+            # Calculate and set cumulative penalty
+            cumulative_penalty = cumulative_penalty_prev + PS.get_penalty(order, t_done)
+            self.__cumulative_penalties[(machine, qi)] = cumulative_penalty
+            cumulative_penalty_prev = cumulative_penalty
+            
+            # Update previous order & t_start
+            order_prev = order
+            t_start = t_done
+            
+        # Set queue penalty to be the last cumulative penalty
+        self.queue_costs[machine] = self.__cumulative_penalties[(machine, len(self.__queues[machine]) - 1)]
     
-    # Draws the schedule using matplotlib.pyplot
-    def draw(self) -> None:
+        # Calc total cose
+        self.cost = sum(self.queue_costs)
+            
+    # FEASABILITY CHECK
+    def is_feasible(self) -> bool:
+        return set(PS.order_ids) == set(oi for queue in self[:,:] for oi in queue)
+    
+    
+    # PLOT USING PYPLOT
+    def plot(self) -> None:
         
         # Get machine order execution start times and durations
-        machine_schedules = self.get_machine_schedules()
+        # machine_schedules = self.get_machine_schedules()
         
         # Determine schedule end-time
-        schedule_completion_time = max([machine_schedule[-1]["end"] for machine_schedule in machine_schedules])
+        schedule_completion_time = max([self.get_completion_time(mi) for mi in PS.machine_ids])
         
         # Declaring a figure "gnt"
-        fig = plt.figure(figsize= (20,5))
+        fig = plt.figure(figsize = (20,5))
         
         # Iterate over machines
-        for machine_id in PS.machine_ids:
+        for mi in PS.machine_ids[::-1]:
             
             # Plot dividing line above current machine schedule
-            if machine_id != 0:
+            if mi != 0:
                 plt.plot(
                     (0, schedule_completion_time), 
-                    (machine_id - 0.5, machine_id - 0.5),
+                    (mi - 0.5, mi - 0.5),
                     "black"
                 )
             
             # Plot order processing
-            for job in machine_schedules[machine_id]:
+            oi: int
+            for qi, oi in enumerate(self[mi, :]):
+                
+                processing_time = PS.get_processing_time(oi, mi)
                 
                 # Add rectangle representing the job
                 plt.gca().add_patch(
                     patches.Rectangle(
                         (
-                            job["start"], 
-                            machine_id - 0.4
+                            self.__completion_times[(mi, qi)] - processing_time, 
+                            mi - 0.4
                         ), 
-                        job["duration"], 
+                        processing_time, 
                         0.8,
                         fill = True, 
-                        facecolor = PS.get_order_color_name(job["order"]),
+                        facecolor = PS.get_order_color_name(oi),
                         # edgecolor = 'red' if (job["cost"] > 0) else 'black',
                         edgecolor = 'black'
                         # linewith = 1
@@ -253,9 +261,9 @@ class Schedule:
                 
                 # Add text to center of rectangle
                 plt.text(
-                    job["start"] + job["duration"] / 2, 
-                    machine_id,
-                    f"O{job['order'] + 1}",
+                    self.__completion_times[(mi, qi)] - processing_time / 2, 
+                    mi,
+                    f"O{oi + 1}",
                     # f"O{job['order'] + 1}\n\n{job['cost']:.0f}",
                     horizontalalignment = "center",
                     verticalalignment = "center",
@@ -281,130 +289,15 @@ class Schedule:
         # Show graph
         plt.show()
         
+    # GET QUEUE COMPLETION TIME
+    def get_completion_time(self, machine_id: int) -> float:
         
-    # Return the time at which the machine with the specified ID finishes it's order queue
-    def get_finish_time(self, machine_id: int) -> float:
-        
-        # Processing time when starting on the current order
-        t = 0
-        last_order_id = None
-        
-        # Iterate over orders in queue
-        for order_id in self.queues[machine_id]:
-            
-            # Add processing time to current time
-            t += PS.get_processing_time(order_id, machine_id)
-            
-            # Add setup time
-            if (last_order_id != None):
-                t += PS.get_setup_time(last_order_id, order_id)
-            
-            # Update last order ID
-            last_order_id = order_id
-            
-        return t
+        return self.__completion_times[(machine_id, len(self[machine_id, :]) - 1)]
     
-    
-    # TODO improve this
-    def calculate_penalties(self) -> None:
-        self.get_cost()
-    
-    
-    
-    # Get the cost for the machine with the given machine_id
-    def get_cost_machine(self, machine_id):
-        # Processing time when starting on the current order
-        t = 0
-        last_order_id = None
-            
-        # Initialize penalty
-        total_penalty = 0
-            
-        # Iterate over orders in queue
-        for queue_index, order_id in enumerate(self.queues[machine_id]):
-            
-            # Add processing time to current time
-            t += PS.get_processing_time(order_id, machine_id)
-            
-            # Add setup time
-            t += PS.get_setup_time(last_order_id, order_id)
-            
-            # Calculate penalty
-            penalty = PS.get_penalty(order_id, t)
-            
-            # Add penalty to total_cost
-            total_penalty += penalty
-            
-            # Save penalty
-            self.penalties[(machine_id, queue_index)] = penalty
-            
-            # Update last order ID
-            last_order_id = order_id
-        
-        return total_penalty
-    
-    
-    # Returns the total cost of the solution
-    def get_cost(self) -> float:
-        """Returns the total penalty for this schedule.
-
-        Returns:
-            float: The total penalty
-        """
-        
-        # Initialize penalty
-        total_penalty = 0
-        
-        # Iterate over machines in schedule
-        for machine_id in PS.machine_ids:
-            
-            total_penalty += self.get_cost_machine(machine_id)
-        
-        # Return total penalty
-        return total_penalty
-    
-    
-    # # Returns a list of all possible moves.
-    # def get_moves(self) -> list[Move]:
-        
-    #     # Get all indices of the orders.
-    #     order_indices = [(machine_id, queue_index) for machine_id in PS.machine_ids for queue_index in range(len(self.queues[machine_id]))]
-        
-    #     # Return all combinations of length 2.
-    #     return list(iter.combinations(order_indices, 2))
-    
-    
+    # CHECK IF INDEX IS LAST IN QUEUE
     def is_last_in_queue(self, index: tuple[int, int]):
         return index[1] == (len(self[index[0], :]) - 1)
     
-    # Return a copy of self
+    # GET COPY
     def get_copy(self):
         return copy.deepcopy(self)
-
-
-
-
-# # # DEBUG
-# # Construct an empty solution dictionary.
-# schedule = Schedule()
-
-# import random as rng
-# import numpy as np
-
-# # Create list of shuffled order ID's
-# order_ids_remaining = PS.order_ids
-# rng.shuffle(order_ids_remaining)
-
-# while len(order_ids_remaining) > 0:
-    
-#     next_order_id_index = rng.choice(range(len(order_ids_remaining)))
-    
-#     schedule[rng.choice(PS.machine_ids), :] += [order_ids_remaining[next_order_id_index]]
-    
-#     order_ids_remaining = np.delete(order_ids_remaining, next_order_id_index)
-    
-#     schedule.calculate_penalties()
-    
-    
-    
-# print(schedule)
