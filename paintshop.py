@@ -1,4 +1,36 @@
+import math
 import pandas as pd
+
+
+# Function to calculate a Sterling number of the second order for n and k.
+# AKA, the amount of ways to k-way partition a set of n elements (excluding empty sets).
+# Used to calculate to size of the solution space.
+# Modified from https://rosettacode.org/wiki/Stirling_numbers_of_the_second_kind#Python
+sterling2_cache = {}
+def sterling2(n, k):
+    
+    # Cache key
+	key = f"{n},{k}"
+
+    # Check for cached
+	if key in sterling2_cache.keys():
+		return sterling2_cache[key]
+
+    # Trivial cases
+	if n == k == 0:
+		return 1
+	if (n > 0 and k == 0) or (n == 0 and k > 0):
+		return 0
+	if n == k:
+		return 1
+	if k > n:
+		return 0
+
+    # Compute
+	result = k * sterling2(n - 1, k) + sterling2(n - 1, k - 1)
+	sterling2_cache[key] = result
+	return result
+
 
 # PAINTSHOP CLASS: holds problem parameters
 class PaintShop:
@@ -27,7 +59,7 @@ class PaintShop:
         
         # Create dictionary of machine speeds (by ID)
         self.machine_speeds = {
-            id: speed 
+            id: speed
             for id, speed 
             in zip(source["machines"].index, source["machines"]["Speed"])
         }
@@ -87,6 +119,16 @@ class PaintShop:
                 order_surface / machine_speed for order_surface in self.orders["surface"].values
             ] for machine_id, machine_speed in self.machine_speeds.items()
         })
+        
+        
+        # Calculate solution space size
+        # The amount of ways to permute the order of a linear list of the orders.
+        permutations = math.factorial(len(self.machine_ids))
+        # The amount of ways to partition a linear list of the orders in m ways (m being the amount of machines)
+        # Allowing empty partitions. (m-1 is the ways to do it with one machine being assigned 0 orders, etc.)
+        # That why we sum the sterling numbers over {1,...,m}
+        partitions = sum([sterling2(self.orders.shape[0], m+1) for m in range(len(self.machine_ids))])
+        self.solution_space_size = permutations * partitions
         
     
     def get_processing_time(self, order: int, machine: int) -> float:
