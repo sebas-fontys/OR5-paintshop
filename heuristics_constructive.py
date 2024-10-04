@@ -105,7 +105,7 @@ class Greedy(ConstructiveHeuristic):
                 # schedule.append(machine_id_next, order_id)
             
             # Cache finished schedule
-            Greedy._schedule_basic = schedule
+            Greedy._schedule = schedule
             
         # Return finished schedule
         return Greedy._schedule

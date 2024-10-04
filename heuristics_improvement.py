@@ -1,21 +1,10 @@
 # IMPORTS
 from abc import ABC, abstractmethod
-import os
-import pickle
 import time
 from move import Move
-from paintshop import PaintShop
 from schedule import Schedule
-import random as rng
 from moveSelectionStrategy import MoveSelectionStrategy
 
-# CONSTANTS
-PS = PaintShop()
-SEED = 420
-
-
-# SETUP
-rng.seed(SEED)
 
 
 
@@ -67,7 +56,7 @@ class ImprovementHeuristic(ABC):
             Schedule can never be None - in the case of termination, it will be the original schedule.
         """
         pass
-   
+
 
 # BASIC DISCRETE IMPROVEMENT (run to local optimum according to given strategy)
 class Basic(ImprovementHeuristic):
@@ -124,8 +113,8 @@ class Basic(ImprovementHeuristic):
         data.move_count = len(data.iterations)
         data.total_time = time.time() - t_total_0
         return data
-    
-    
+
+
 # TABOO SEARCH (allow non-improving moves but keep a blacklist of previous solutions)
 class Taboo(ImprovementHeuristic):
 
@@ -137,7 +126,6 @@ class Taboo(ImprovementHeuristic):
         self.improvement_strategy = improvement_strategy
         self.non_improvement_strategy = non_improvement_strategy
         self.max_iterations = max_iterations
-    
     
     #
     def run(self, schedule: Schedule, verbosity: 0|1|2 = 2, cached: HeuristicRunData = None) -> HeuristicRunData:
@@ -182,7 +170,7 @@ class Taboo(ImprovementHeuristic):
                 # (Re)define criteria (should arguably be a lambda)
                 if self.taboo_count is None:
                     def criteria_nontaboo(schedule: Schedule) -> bool:
-                        return hash(schedule) not in history # Because math.inf doesn't work with slices :(
+                        return hash(schedule) not in history
                 else:
                     def criteria_nontaboo(schedule: Schedule) -> bool:
                         return hash(schedule) not in history[-self.taboo_count::] # Dayum... [1,2,3,4,5][-3::] => [3,4,5]
@@ -245,8 +233,3 @@ class Taboo(ImprovementHeuristic):
 # Not sure if and why this is neccessary
 ImprovementHeuristic.register(Basic)
 ImprovementHeuristic.register(Taboo)
-
-# class ImprovementHeuristics:
-#     basic: Basic
-#     taboo: Taboo
-#     all: list[ImprovementHeuristic] = [basic, taboo]
