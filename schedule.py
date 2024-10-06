@@ -87,23 +87,20 @@ class Schedule:
         return self.__queues[index[0]][index[1]]
     
     # INDEX SETTER (supports slicing for the second index)
-    def __setitem__(self, index: tuple[int, int], order: int) -> None:
+    # TODO: Fix -> doesnt work when using two slices like: schedule[:,:] = [[],[],[]]
+    def __setitem__(self, index: tuple[int, int], order: int | list[int] | list[list[int]]) -> None:
+        
+        # If index[0] is a slice, loop over slice indices
+        if isinstance(index[0], slice):
+            for i in index[0].indices(len(order)):
+                self.__queues[i][index[1]] = order[i]
+            return
+        
         self.__queues[index[0]][index[1]] = order
-        
-        # Check for slice, recalculate from start of slice
-        # This indices method ensures that it works with any slice ([-1:-1] for example)
-        if isinstance(index[1], slice):
-            index = (index[0], index[1].indices(len(self.__queues[index[0]]))[0])
-        
-        self.calc_queue_cost_from(index[0], index[1])
     
     # INDEX DELETION (can use slice, but not using negative number)
     def __delitem__(self, index: tuple[int, int]):
-        
-        # Set queue as two contatenated slices where the item at index is skipped.
-        # self[index[0], :] = self[index[0], :index[1]] + self[index[0], (index[1]+1):]
         del self.__queues[index[0]][index[1]]
-        self.calc_queue_cost_from(index[0], index[1])
         
     # STRING CONVERSION
     def __str__(self) -> str:
