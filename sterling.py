@@ -76,7 +76,7 @@ def ith_subset(A: list, k: int, i: int) -> list:
         i -= extra
     return [A[x]] + ith_subset(A[x+1:],k-1,i)
 
-def gen_part(A: list, k: int, i: int):
+def gen_part(A: list, k: int, i: int) -> list[list]:
     """Return i^th k-partition of elements in A (zero-indexed) as list of lists"""
     if k==1:
         return [A]
