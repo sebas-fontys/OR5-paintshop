@@ -1,4 +1,5 @@
 import math
+import os
 import pandas as pd
 from sterling import count_part_empty_allowed
 
@@ -7,7 +8,7 @@ from sterling import count_part_empty_allowed
 class PaintShop:
     
     # STATIC
-    __data_filepath = "PaintShop - September 2024.xlsx"
+    __data_filepath = os.path.join("resources", "PaintShop - September 2024.xlsx")
     __sheet_names_by_table_name = {
         "orders": "Orders", 
         "machines": "Machines", 
