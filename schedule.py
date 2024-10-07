@@ -267,7 +267,7 @@ class Schedule:
                 ) 
         
         # Graph decoration
-        plt.title(f"Schedule. Duration: {schedule_completion_time:.0f}. Cost: {self.get_cost():.0f}")
+        plt.title(f"Schedule. Duration: {schedule_completion_time:.0f}. Cost: {self.cost:.0f}")
         plt.ylim(-0.5, len(PS.machine_ids) - 0.5)
         plt.xlim(0, schedule_completion_time)
         plt.yticks(PS.machine_ids, [f"M{id+1}" for id in PS.machine_ids])
@@ -288,7 +288,6 @@ class Schedule:
         
     # GET QUEUE COMPLETION TIME
     def get_completion_time(self, machine_id: int) -> float:
-        
         return self.__completion_times[(machine_id, len(self[machine_id, :]) - 1)]
     
     # CHECK IF INDEX IS LAST IN QUEUE

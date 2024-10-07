@@ -233,3 +233,9 @@ class Taboo(ImprovementHeuristic):
 # Not sure if and why this is neccessary
 ImprovementHeuristic.register(Basic)
 ImprovementHeuristic.register(Taboo)
+
+
+class ImprovementHeuristics:
+    simple = Basic
+    greedy = Taboo
+    all: list[ImprovementHeuristic] = [simple, greedy]
