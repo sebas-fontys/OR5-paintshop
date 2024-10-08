@@ -51,7 +51,7 @@ class First(MoveSelectionStrategy):
         # If no criteria, return first move
         if solution_allow_criteria is None:
             move: Move = moves[0]
-            return move.get_moved(schedule)
+            return (move, move.get_moved(schedule))
         
         # Loop over the moves to find the first allowed move
         for move in moves:
@@ -83,7 +83,7 @@ class Random(MoveSelectionStrategy):
         # If no criteria, return first move
         if solution_allow_criteria is None:
             move: Move = moves[0]
-            return move.get_moved(schedule)
+            return (move, move.get_moved(schedule))
         
         # Loop over the moves to find the first allowed move
         for move in moves:
