@@ -1,9 +1,11 @@
 # IMPORTS
+import random as rng
+import numpy as np
 from abc import ABC, abstractmethod
 import time
 from move import Move
 from schedule import Schedule
-from moveSelectionStrategy import MoveSelectionStrategy
+from moveSelectionStrategy import MoveSelectionStrategies, MoveSelectionStrategy
 
 
 
@@ -229,14 +231,45 @@ class Taboo(ImprovementHeuristic):
         data.total_time = time.time() - t_total_0
         return data
 
+class Annealing(ImprovementHeuristic):
+    def __init__(self, initial_temp,cool_rate,it_per_temp,end_temp):
+        self.initial_temp=initial_temp
+        self.cool_rate=cool_rate
+        self.it_per_temp=it_per_temp
+        self.end_temp=end_temp
+
+    def run(self, schedule: Schedule, verbosity: 0|1|2 = 2, cached: HeuristicRunData = None):
+        
+        #t_0=time.time()
+        temp=self.initial_temp
+        data = HeuristicRunData(schedule)
+        bestest = schedule
+        log_bestest=[]
+        log_it=[]
+        while temp > self.end_temp:
+            for _ in range(self.it_per_temp):
+                useless, moved=MoveSelectionStrategies.random.try_get_move(schedule)
+                delta=moved.cost-schedule.cost
+                if delta < 0 or rng.random() < np.exp(-delta/temp):
+                    schedule=moved
+                    if schedule.cost < bestest.cost:
+                        bestest=schedule
+                    log_bestest+=[bestest.cost]
+                log_it+=[schedule.cost]
+            temp*=self.cool_rate
+            print(schedule)
+            print(temp)
+        print(bestest)
+        return (log_bestest, log_it,bestest)
     
 # Not sure if and why this is neccessary
 ImprovementHeuristic.register(Basic)
 ImprovementHeuristic.register(Taboo)
-
+ImprovementHeuristic.register(Annealing)
 
 class ImprovementHeuristics:
     
-    simple = Basic
-    greedy = Taboo
-    all: list[ImprovementHeuristic] = [simple, greedy]
+    basic = Basic
+    taboo = Taboo
+    annealing = Annealing
+    all: list[ImprovementHeuristic] = [basic, taboo, annealing]
