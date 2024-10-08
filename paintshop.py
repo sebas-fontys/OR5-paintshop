@@ -22,6 +22,9 @@ class PaintShop:
     # CONSTRUCTOR
     def __init__(self, source_file: Source):
         
+        # Keep track of the source file name.
+        self.source_id = source_file.name
+        
         # Set source tables
         # We keep the source data in a dictionary in order to prevent confusion about what tables are source and what are derived.
         self.source = os.path.join(PaintShop.__source_folder, source_file.value)
