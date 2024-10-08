@@ -103,7 +103,13 @@ class MoveMove(Move):
         
         # Apply move (little something i leared called 'slice assignment' and the 'del keyword')
         new[self.b[0], self.b[1]:self.b[1]] = [old[self.a]]
-        del new[self.a]
+        
+        # If an item moves to a position in from of its old position,
+        # it's old position will move up by one. (we found out the hard way)
+        if (self.a[0] == self.b[0]) and (self.b[1] < self.a[1]):
+            del new[(self.a[0], self.a[1] + 1)]
+        else:
+            del new[self.a]
         
         # Recalc penalties
         if self.a[0] == self.b[0]:
