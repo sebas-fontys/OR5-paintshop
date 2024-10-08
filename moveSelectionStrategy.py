@@ -80,6 +80,9 @@ class Random(MoveSelectionStrategy):
         moves: list[Move] = get_moves(schedule)
         rng.shuffle(moves)
         
+        # DEBUG
+        # print(moves[0])
+        
         # If no criteria, return first move
         if solution_allow_criteria is None:
             move: Move = moves[0]
@@ -128,7 +131,7 @@ MoveSelectionStrategy.register(Random)
 
 
 class MoveSelectionStrategies:
-    first:  MoveSelectionStrategy = First
-    best:   MoveSelectionStrategy = Best
-    random: MoveSelectionStrategy = Random
-    all = [first, best, random]
+    first  = First
+    best   = Best
+    random = Random
+    all: list[MoveSelectionStrategy] = [first, best, random]

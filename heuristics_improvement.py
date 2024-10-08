@@ -162,7 +162,7 @@ class Taboo(ImprovementHeuristic):
             move, moved_schedule = self.improvement_strategy.try_get_move(
                 schedule, 
                 criteria_improve
-            )
+)
             
             # No improving move found: Do a non improving move that is not taboo
             if move is None:

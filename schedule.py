@@ -83,7 +83,7 @@ class Schedule:
 
         Returns:
             list[int] or int: The order index at the specified position in the schedule or the queue for the specified machine if the second index is a slice.
-        """
+        """        
         return self.__queues[index[0]][index[1]]
     
     # INDEX SETTER (supports slicing for the second index)

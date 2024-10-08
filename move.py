@@ -125,8 +125,10 @@ class MoveMove(Move):
             for machine_id in PS.machine_ids for queue_index in range(len(schedule[machine_id, :]))
         ]
         
-        # Create list of all moves where item 1 is put in from of item 2 (this excludes cases where an item would be put in front of itself)
-        moves = list(iter.combinations(order_indices, 2))
+        # Create list of all moves where item 1 is put in front of item 2 (this excludes cases where an item would be put in front of itself)
+        all_possible_swaps = list(iter.combinations(order_indices, 2))
+        
+        moves = all_possible_swaps + [(b, a) for a, b in all_possible_swaps]
         
         # Add the moves where it is added to the end of a queue (slice assigment will add it to the end. It will not throw AOB)
         for order_index in order_indices:
