@@ -7,7 +7,7 @@ import matplotlib.patches as mpatches
 
 # Initialize PaintShop
 from paintshop import PaintShop
-PS = PaintShop()
+# PS = PaintShop()
 
 
 # Utility funcions
@@ -34,7 +34,10 @@ class Schedule:
     """
     
     # CONSTRUCTOR
-    def __init__(self):
+    def __init__(self, PS: PaintShop):
+        
+        self.PS = PS
+        
         """Constructs an empty schedule."""
         self.__queues: list[list[int]] = [
             [] for _ in PS.machine_ids
@@ -106,14 +109,14 @@ class Schedule:
     def __str__(self) -> str:
         
         # Determine machine strings
-        machine_strings = [f'M{machine_id + 1}: ' for machine_id in PS.machine_ids]
+        machine_strings = [f'M{machine_id + 1}: ' for machine_id in self.PS.machine_ids]
         longest_ms = max([len(ms) for ms in machine_strings])
         machine_strings_justed = [
             f'{ms.ljust(longest_ms)}' for ms in machine_strings
         ]
         
         # Determine queue strings
-        longest_order_id = len(str(max(PS.order_ids)))
+        longest_order_id = len(str(max(self.PS.order_ids)))
         longest_queue = max([len(queue) for queue in self.__queues])
         queue_strings_basic = [[str(id).rjust(longest_order_id) for id in queue] for queue in self.__queues]
         queue_string_lengths = [len('  '.join(qs)) for qs in queue_strings_basic]
@@ -139,7 +142,7 @@ class Schedule:
         
         # Determine cost strings
         cost_strings = [
-            f' {self.queue_costs[machine_id]:.2f}' for machine_id in PS.machine_ids
+            f' {self.queue_costs[machine_id]:.2f}' for machine_id in self.PS.machine_ids
         ]
         longest_cs = max([len(cs) for cs in cost_strings])
         cost_strings_justed = [
@@ -148,7 +151,7 @@ class Schedule:
         
         # Determine cost % strings
         cost_fracs = [
-            (f' ({(self.queue_costs[machine_id] / self.cost * 100):.0f}%)' if self.cost > 0 else '') for machine_id in PS.machine_ids
+            (f' ({(self.queue_costs[machine_id] / self.cost * 100):.0f}%)' if self.cost > 0 else '') for machine_id in self.PS.machine_ids
         ]
         
         # Determine header
@@ -158,14 +161,14 @@ class Schedule:
         
         return '\n'.join([
             header,
-            '\n'.join([machine_strings_justed[i] + queue_strings_justed[i] + cost_strings_justed[i] + cost_fracs[i] for i in PS.machine_ids]),
+            '\n'.join([machine_strings_justed[i] + queue_strings_justed[i] + cost_strings_justed[i] + cost_fracs[i] for i in self.PS.machine_ids]),
             # footer
         ])
 
     
     # COST CALCULATION
     def calc_cost(self):
-        for mi in PS.machine_ids:
+        for mi in self.PS.machine_ids:
             self.calc_queue_cost_from(mi, 0)
     
     # OPTIMISED COST CALCULATION
@@ -187,11 +190,11 @@ class Schedule:
             order = self.__queues[machine][qi]
             
             # Get and set completion time
-            t_done = t_start + PS.get_processing_time(order, machine) + PS.get_setup_time(order_prev, order)
+            t_done = t_start + self.PS.get_processing_time(order, machine) + self.PS.get_setup_time(order_prev, order)
             self.__completion_times[(machine, qi)] = t_done
             
             # Calculate and set cumulative penalty
-            cumulative_penalty = cumulative_penalty_prev + PS.get_penalty(order, t_done)
+            cumulative_penalty = cumulative_penalty_prev + self.PS.get_penalty(order, t_done)
             self.__cumulative_penalties[(machine, qi)] = cumulative_penalty
             cumulative_penalty_prev = cumulative_penalty
             
@@ -207,7 +210,7 @@ class Schedule:
             
     # FEASABILITY CHECK
     def is_feasible(self) -> bool:
-        return set(PS.order_ids) == set(oi for queue in self[:,:] for oi in queue)
+        return set(self.PS.order_ids) == set(oi for queue in self[:,:] for oi in queue)
     
     
     # PLOT USING PYPLOT
@@ -217,13 +220,13 @@ class Schedule:
         # machine_schedules = self.get_machine_schedules()
         
         # Determine schedule end-time
-        schedule_completion_time = max([self.get_completion_time(mi) for mi in PS.machine_ids])
+        schedule_completion_time = max([self.get_completion_time(mi) for mi in self.PS.machine_ids])
         
         # Declaring a figure "gnt"
         fig = plt.figure(figsize = (20,5))
         
         # Iterate over machines
-        for mi in PS.machine_ids[::-1]:
+        for mi in self.PS.machine_ids[::-1]:
             
             # Plot dividing line above current machine schedule
             if mi != 0:
@@ -237,7 +240,7 @@ class Schedule:
             oi: int
             for qi, oi in enumerate(self[mi, :]):
                 
-                processing_time = PS.get_processing_time(oi, mi)
+                processing_time = self.PS.get_processing_time(oi, mi)
                 
                 # Add rectangle representing the job
                 plt.gca().add_patch(
@@ -249,7 +252,7 @@ class Schedule:
                         processing_time, 
                         0.8,
                         fill = True, 
-                        facecolor = PS.get_order_color_name(oi),
+                        facecolor = self.PS.get_order_color_name(oi),
                         # edgecolor = 'red' if (job["cost"] > 0) else 'black',
                         edgecolor = 'black'
                         # linewith = 1
@@ -270,12 +273,12 @@ class Schedule:
         plt.title(f"Schedule. Duration: {schedule_completion_time:.0f}. Cost: {self.cost:.0f}")
         plt.ylim(-0.5, len(PS.machine_ids) - 0.5)
         plt.xlim(0, schedule_completion_time)
-        plt.yticks(PS.machine_ids, [f"M{id+1}" for id in PS.machine_ids])
+        plt.yticks(self.PS.machine_ids, [f"M{id+1}" for id in self.PS.machine_ids])
         plt.xlabel(f"Elapsed time units since start of schedule execution.")
         
         # Compose custom legend
         colors_patches = [
-            mpatches.Patch(color=c, label=c) for c in PS.get_color_names()
+            mpatches.Patch(color=c, label=c) for c in self.PS.get_color_names()
         ]
         plt.legend(
             handles = colors_patches,

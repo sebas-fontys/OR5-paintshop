@@ -10,7 +10,7 @@ from schedule import Schedule
 import random as rng
 
 # CONSTANTS
-PS = PaintShop()
+# PS = PaintShop()
 SEED = 420
 
 

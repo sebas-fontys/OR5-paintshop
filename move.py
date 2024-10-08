@@ -7,7 +7,7 @@ from paintshop import PaintShop
 
 
 # CONSTANTS
-PS = PaintShop()
+# PS = PaintShop()
 
 # Move (Abstract Base Class) (https://docs.python.org/3/library/abc.html)
 class Move(ABC):
@@ -71,7 +71,7 @@ class SwapMove(Move):
         # Get all queue-indices of the orders.
         order_indices = [
             (machine_id, queue_index) 
-            for machine_id in PS.machine_ids for queue_index in range(len(schedule[machine_id, :]))
+            for machine_id in schedule.PS.machine_ids for queue_index in range(len(schedule[machine_id, :]))
         ]
         
         # Return all combinations of length 2.
@@ -128,7 +128,7 @@ class MoveMove(Move):
         # Get all queue-indices of the orders. [(0,0), (0,1), (0,2), ...]
         order_indices = [
             (machine_id, queue_index) 
-            for machine_id in PS.machine_ids for queue_index in range(len(schedule[machine_id, :]))
+            for machine_id in schedule.PS.machine_ids for queue_index in range(len(schedule[machine_id, :]))
         ]
         
         # Create list of all moves where item 1 is put in front of item 2 (this excludes cases where an item would be put in front of itself)
@@ -148,7 +148,7 @@ class MoveMove(Move):
                         order_index, 
                         (machine_id, len(schedule[machine_id, :]))
                     )
-                    for machine_id in PS.machine_ids
+                    for machine_id in schedule.PS.machine_ids
                 ]
         
         # Remove moves where it would be inserted behind itself. (this would do nothing, since the source is deleted afterwards)
@@ -200,10 +200,10 @@ class SwapQueuesMove(Move):
     
     
     @staticmethod
-    def get_moves():
+    def get_moves(schedule: Schedule):
         
         # Return all 2-item combinations of the machine ID's
-        return [SwapQueuesMove(move) for move in list(iter.combinations(PS.machine_ids, 2))]
+        return [SwapQueuesMove(move) for move in list(iter.combinations(schedule.PS.machine_ids, 2))]
     
 
 
@@ -221,7 +221,7 @@ def get_moves(schedule: Schedule) -> list[Move]:
     return [
         *SwapMove.get_moves(schedule),
         *MoveMove.get_moves(schedule),
-        *SwapQueuesMove.get_moves()
+        *SwapQueuesMove.get_moves(schedule)
     ]
 
 # ???

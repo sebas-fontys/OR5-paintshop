@@ -9,9 +9,7 @@ import random as rng
 from sterling import count_part, gen_part
 
 # CONSTANTS
-PS = PaintShop()
 SEED = 420
-
 
 # SETUP
 rng.seed(SEED)
@@ -29,21 +27,25 @@ class ConstructiveHeuristic(ABC):
 # BASIC
 class Simple(ConstructiveHeuristic):
     
+    def __init__(self, PS: PaintShop):
+        self.PS = PS
+    
+    # STATIC
     name = "Simple"
     
-    @staticmethod
-    def get_schedule(verbosity: 0|1 = 0) -> Schedule:
+    # @staticmethod
+    def get_schedule(self, verbosity: 0|1 = 0) -> Schedule:
         
         # Construct an empty schedule.
         schedule = Schedule()
         
         # For each order, ordered by their deadline
-        for order_id in sorted(PS.order_ids, key = lambda order_id: PS.orders.loc[order_id, 'deadline']):
+        for order_id in sorted(self.PS.order_ids, key = lambda order_id: self.PS.orders.loc[order_id, 'deadline']):
             
             # Add order to the queue of the machine with the lowest completion time.
             machine_id_next = sorted(
-                PS.machine_ids, 
-                key = lambda i: len(schedule[i, :]) + i / len(PS.machine_ids)
+                self.PS.machine_ids, 
+                key = lambda i: len(schedule[i, :]) + i / len(self.PS.machine_ids)
             )[0]
             
             # Add order to machine queue.
@@ -66,20 +68,24 @@ class Simple(ConstructiveHeuristic):
 # GREEDY
 class Greedy(ConstructiveHeuristic):
     
+    def __init__(self, PS: PaintShop):
+        self.PS = PS
+    
+    # STATIC
     name = "Greedy"
     
-    @staticmethod
-    def get_schedule(verbosity: 0|1 = 0) -> Schedule:
+    # @staticmethod
+    def get_schedule(self, verbosity: 0|1 = 0) -> Schedule:
         
         # Construct an empty schedule.
         schedule = Schedule()
         
         # For each order, ordered by their deadline
-        for order_id in sorted(PS.order_ids, key = lambda order_id: PS.orders.loc[order_id, 'deadline']):
+        for order_id in sorted(self.PS.order_ids, key = lambda order_id: self.PS.orders.loc[order_id, 'deadline']):
             
             # Add order to the queue of the machine with the lowest completion time.
             machine_id_next = sorted(
-                PS.machine_ids, 
+                self.PS.machine_ids, 
                 key = lambda i: schedule.get_completion_time(i)
             )[0]
             
@@ -98,10 +104,14 @@ class Greedy(ConstructiveHeuristic):
 # RANDOM
 class Random(ConstructiveHeuristic):    
     
+    def __init__(self, PS: PaintShop):
+        self.PS = PS
+    
+    # STATIC
     name = "Random"
     
-    @staticmethod
-    def get_schedule(verbosity: 0|1 = 0) -> Schedule:
+    # @staticmethod
+    def get_schedule(self, verbosity: 0|1 = 0) -> Schedule:
         """Generates a random schedule, with an equal probability for all possible schedules.
 
         Args:
@@ -112,20 +122,20 @@ class Random(ConstructiveHeuristic):
         """
         
         # Construct an empty solution dictionary.
-        schedule = Schedule()
+        schedule = Schedule(self.PS)
         
         # Create list of shuffled order ID's
-        orders = copy.copy(PS.order_ids)
+        orders = copy.copy(self.PS.order_ids)
         rng.shuffle(orders)
         
-        part_i = rng.randint(0, count_part(30, 3))
+        part_i = rng.randint(0, self.PS.solution_space_partitions)
         
         if verbosity > 0:
             print(f"Generating {part_i}th partitioning of shuffled orders: {orders}")
         
         # Assign to the schedule queue a random partitioning of the schuffled orders.
         # Assigning using two slices doesn't work.
-        for i, part in enumerate(gen_part(list(range(30)), 3, part_i)):
+        for i, part in enumerate(gen_part(list(range(len(self.PS.order_ids))), len(self.PS.machine_ids), part_i)):
             schedule[i, :] = part
         # schedule[:,:] = gen_part(list(range(30)), 3, part_i)
         
@@ -143,7 +153,11 @@ ConstructiveHeuristic.register(Random)
 
 
 class ConstructiveHeuristics:
-    simple = Simple
-    greedy = Greedy
-    random = Random
-    all: list[ConstructiveHeuristic] = [simple, greedy, random]
+    
+    def __init__(self, PS: PaintShop):
+        self.PS = PS
+    
+        self.simple = Simple(self.PS)
+        self.greedy = Greedy(self.PS)
+        self.random = Random(self.PS)
+        self.all: list[ConstructiveHeuristic] = [self.simple, self.greedy, self.random]

@@ -3,12 +3,16 @@ import os
 import pandas as pd
 from sterling import count_part_empty_allowed
 
+from enum import Enum
+class Source(Enum):
+    SEPTEMBER = "PaintShop - September 2024.xlsx"
+    NOVEMBER  = "PaintShop - November 2024.xlsx"
 
 # PAINTSHOP CLASS: holds problem parameters
 class PaintShop:
     
     # STATIC
-    __data_filepath = os.path.join("resources", "PaintShop - September 2024.xlsx")
+    __source_folder = "resources"
     __sheet_names_by_table_name = {
         "orders": "Orders", 
         "machines": "Machines", 
@@ -16,29 +20,32 @@ class PaintShop:
     }
     
     # CONSTRUCTOR
-    def __init__(self):
+    def __init__(self, source_file: Source):
         
         # Set source tables
         # We keep the source data in a dictionary in order to prevent confusion about what tables are source and what are derived.
-        source = {
-            table_name: pd.read_excel(self.__data_filepath, sheet_name) 
+        self.source = os.path.join(PaintShop.__source_folder, source_file.value)
+        
+        source_file = {
+            table_name: pd.read_excel(self.source, sheet_name) 
             for table_name, sheet_name in self.__sheet_names_by_table_name.items()
         }
+        print(f"Loaded '{self.source}'")
         
         
         # Give each machine an ID (index in source table)
-        self.machine_ids: list[int] = source["machines"].index.tolist()
+        self.machine_ids: list[int] = source_file["machines"].index.tolist()
         
         # Create dictionary of machine speeds (by ID)
         self.machine_speeds = {
             id: speed
             for id, speed 
-            in zip(source["machines"].index, source["machines"]["Speed"])
+            in zip(source_file["machines"].index, source_file["machines"]["Speed"])
         }
         
         
         # Encode color names with ID's, create dict to get names by ID.
-        unique_colors = source["setups"]["From colour"].unique()
+        unique_colors = source_file["setups"]["From colour"].unique()
         self.__color_names_by_id = {
             index: name for index, name in enumerate(unique_colors)
         }
@@ -48,20 +55,20 @@ class PaintShop:
         
         # Encode color names in setups
         setups = pd.DataFrame({
-            "c1":   source["setups"]["From colour"].apply(lambda color_prev: color_ids_by_name[color_prev]),
-            "c2":   source["setups"]["To colour"  ].apply(lambda color_next: color_ids_by_name[color_next]),
-            "time": source["setups"]["Setup time" ]
+            "c1":   source_file["setups"]["From colour"].apply(lambda color_prev: color_ids_by_name[color_prev]),
+            "c2":   source_file["setups"]["To colour"  ].apply(lambda color_next: color_ids_by_name[color_next]),
+            "time": source_file["setups"]["Setup time" ]
         })
         
         
         # Fix orders table: encode colors and set index as order ID
-        self.order_ids: list[int] = source["orders"].index.tolist()
+        self.order_ids: list[int] = source_file["orders"].index.tolist()
         self.orders = pd.DataFrame(
             {
-                "surface":  source["orders"]["Surface" ].values,
-                "color":    source["orders"]["Colour"  ].apply(lambda c: color_ids_by_name[c]),
-                "deadline": source["orders"]["Deadline"].values,
-                "penalty":  source["orders"]["Penalty" ].values,
+                "surface":  source_file["orders"]["Surface" ].values,
+                "color":    source_file["orders"]["Colour"  ].apply(lambda c: color_ids_by_name[c]),
+                "deadline": source_file["orders"]["Deadline"].values,
+                "penalty":  source_file["orders"]["Penalty" ].values,
             },
             index = self.order_ids
         )
