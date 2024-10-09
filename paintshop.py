@@ -1,7 +1,5 @@
-import math
 import os
 import pandas as pd
-from sterling import count_part_empty_allowed
 
 from enum import Enum
 class Source(Enum):
@@ -38,6 +36,7 @@ class PaintShop:
         
         # Give each machine an ID (index in source table)
         self.machine_ids: list[int] = source_file["machines"].index.tolist()
+        self.machine_count = len(self.machine_ids)
         
         # Create dictionary of machine speeds (by ID)
         self.machine_speeds = {
@@ -66,6 +65,7 @@ class PaintShop:
         
         # Fix orders table: encode colors and set index as order ID
         self.order_ids: list[int] = source_file["orders"].index.tolist()
+        self.order_count = len(self.order_ids)
         self.orders = pd.DataFrame(
             {
                 "surface":  source_file["orders"]["Surface" ].values,
@@ -101,16 +101,6 @@ class PaintShop:
                 order_surface / machine_speed for order_surface in self.orders["surface"].values
             ] for machine_id, machine_speed in self.machine_speeds.items()
         })
-        
-        
-        # Calculate solution space size
-        # The amount of ways to permute the order of a linear list of the orders.
-        permutations = math.factorial(len(self.order_ids))
-        # The amount of ways to partition a linear list of the orders in m ways (m being the amount of machines)
-        # Allowing empty partitions. (m-1 is the ways to do it with one machine being assigned 0 orders, etc.)
-        # That why we sum the sterling numbers over {1,...,m}
-        self.solution_space_partitions = count_part_empty_allowed(self.orders.shape[0], len(self.machine_ids))
-        self.solution_space_size = permutations * self.solution_space_partitions
         
     
     def get_processing_time(self, order: int, machine: int) -> float:

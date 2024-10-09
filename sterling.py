@@ -94,9 +94,3 @@ def gen_part(A: list, k: int, i: int) -> list[list]:
     subset = [A[0]] + ith_subset(A[1:],y,count_subset)
     S=set(subset)
     return  [subset] + gen_part([a for a in A if a not in S],k-1,count_partition)
-
-
-
-# Made this myself based on my understanding of k-subset partitioning allowing empty sets.
-def count_part_empty_allowed(n: int, k: int) -> int:
-    return sum([count_part(n, m+1) for m in range(k)])

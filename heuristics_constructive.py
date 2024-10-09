@@ -1,11 +1,14 @@
 # IMPORTS
 from abc import ABC, abstractmethod
 import copy
+from itertools import permutations
+from math import factorial
 
 from paintshop import PaintShop
 from schedule import Schedule
 import random as rng
 
+from solution_space import get_ith_solution, get_solution_space_size
 from sterling import count_part, gen_part
 
 # CONSTANTS
@@ -111,7 +114,7 @@ class Random(ConstructiveHeuristic):
     name = "Random"
     
     # @staticmethod
-    def get_schedule(self, verbosity: 0|1 = 0) -> Schedule:
+    def get_schedule(self, verbosity: 0|1 = 0, i = 0) -> Schedule:
         """Generates a random schedule, with an equal probability for all possible schedules.
 
         Args:
@@ -124,25 +127,14 @@ class Random(ConstructiveHeuristic):
         # Construct an empty solution dictionary.
         schedule = Schedule(self.PS)
         
-        # Create list of shuffled order ID's
-        orders = copy.copy(self.PS.order_ids)
-        rng.shuffle(orders)
+        # Generate a number in the range [0, solution space size)
+        i = rng.randint(0, get_solution_space_size(self.PS))
         
-        part_i = rng.randint(0, self.PS.solution_space_partitions)
-        
-        if verbosity > 0:
-            print(f"Generating {part_i}th partitioning of shuffled orders: {orders}")
-        
-        # Assign to the schedule queue a random partitioning of the schuffled orders.
-        # Assigning using two slices doesn't work.
-        for i, part in enumerate(gen_part(list(range(len(self.PS.order_ids))), len(self.PS.machine_ids), part_i)):
-            schedule[i, :] = part
-        # schedule[:,:] = gen_part(list(range(30)), 3, part_i)
-        
-        # Calc cost
+        # Set queues & calulate cost
+        schedule[:,:] = get_ith_solution(self.PS, i)
         schedule.calc_cost()
         
-        # return
+        # Return
         return schedule
 
 

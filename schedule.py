@@ -95,7 +95,7 @@ class Schedule:
         
         # If index[0] is a slice, loop over slice indices
         if isinstance(index[0], slice):
-            for i in index[0].indices(len(order)):
+            for i in range(*index[0].indices(len(order))):
                 self.__queues[i][index[1]] = order[i]
             return
         
