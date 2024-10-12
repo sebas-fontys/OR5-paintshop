@@ -31,7 +31,7 @@ class PaintShop:
             table_name: pd.read_excel(self.source, sheet_name) 
             for table_name, sheet_name in self.__sheet_names_by_table_name.items()
         }
-        print(f"Loaded '{self.source}'")
+        print(f"[PaintShop] Loaded '{self.source}'")
         
         
         # Give each machine an ID (index in source table)

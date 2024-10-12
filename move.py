@@ -13,25 +13,28 @@ from paintshop import PaintShop
 class Move(ABC):
     
     # As I'm still testing out abstract base classes, I'm raising an exception.
-    # Apparantly, this method can only be called by subclasses calling super.func()
+    # Apparantly, abstact methods can only be called by subclasses calling super.func()
+    @abstractmethod
+    def __init__(self, queue_indices: tuple[tuple[int, int], tuple[int, int]]):
+        pass
+        
+    # STR
+    @abstractmethod
+    def __str__(self):
+        pass
+    
     @abstractmethod
     def get_moved(self, schedule_old: Schedule) -> Schedule:
-        raise Exception("Abstract method used.")
+        pass
     
-    # @staticmethod
-    # # @abstractmethod
-    # def get_moves(schedule: Schedule):
-        
-    #     return [
-    #         *SwapMove.get_moves(schedule),
-    #         *MoveMove.get_moves(schedule),
-    #         *SwapQueuesMove.get_moves(schedule)
-    #     ]
-    #     # raise Exception("Abstract method used.")
-
-    # @abstractmethod
-    # def get_gain(self) -> float:
-    #     raise Exception("Abstract method used.")
+    @staticmethod
+    @abstractmethod
+    def get_moves(schedule: Schedule) -> list:
+        pass
+    
+    @abstractmethod
+    def is_moved(mi, qi) -> bool:
+        pass
 
 # Swap two orders by queue index.
 class SwapMove(Move):
@@ -63,6 +66,7 @@ class SwapMove(Move):
             new.calc_queue_cost_from(self.b[0], self.b[1])
         
         # Return swapped copy
+        new.move = self # This may be controversial
         return new
     
     @staticmethod
@@ -71,7 +75,7 @@ class SwapMove(Move):
         # Get all queue-indices of the orders.
         order_indices = [
             (machine_id, queue_index) 
-            for machine_id in schedule.PS.machine_ids for queue_index in range(len(schedule[machine_id, :]))
+            for machine_id in schedule.ps.machine_ids for queue_index in range(len(schedule[machine_id, :]))
         ]
         
         # Return all combinations of length 2.
@@ -79,10 +83,9 @@ class SwapMove(Move):
             SwapMove(swap) for swap in list(iter.combinations(order_indices, 2))
         ]
     
-    # # Get the change in cost resulting from this swap in a optimised way.
-    # def get_gain(self, s: Schedule):
-        
-    #     return 
+    def is_moved(self, mi, qi):
+        return (mi, qi) in [self.a, self.b]
+    
 
 # Swap two orders by queue index.
 class MoveMove(Move):
@@ -119,6 +122,7 @@ class MoveMove(Move):
             new.calc_queue_cost_from(self.b[0], self.b[1])
             
         # Return swapped copy
+        new.move = self # This may be controversial
         return new
     
     # Return all possible move-moves
@@ -128,7 +132,7 @@ class MoveMove(Move):
         # Get all queue-indices of the orders. [(0,0), (0,1), (0,2), ...]
         order_indices = [
             (machine_id, queue_index) 
-            for machine_id in schedule.PS.machine_ids for queue_index in range(len(schedule[machine_id, :]))
+            for machine_id in schedule.ps.machine_ids for queue_index in range(len(schedule[machine_id, :]))
         ]
         
         # Create list of all moves where item 1 is put in front of item 2 (this excludes cases where an item would be put in front of itself)
@@ -148,25 +152,31 @@ class MoveMove(Move):
                         order_index, 
                         (machine_id, len(schedule[machine_id, :]))
                     )
-                    for machine_id in schedule.PS.machine_ids
+                    for machine_id in schedule.ps.machine_ids
                 ]
         
         # Remove moves where it would be inserted behind itself. (this would do nothing, since the source is deleted afterwards)
         # Note: Since swapping index n with index n+1 is the same as moving n in front of n+2, these are exluded also.
+        # swap: (0, 13) <=> (0, 14) is equal to move: (0, 14) => (0, 13)
         moves = [
             move for move in moves if not # if NOT
             (
                 (move[0][0] == move[1][0]) and             # On the same machine AND
                 (
-                    (move[1][1] == (move[0][1] + 1)) or    # Target is n+1
-                    (move[1][1] == (move[0][1] + 2))       # Target is n+2
+                    (move[1][1] == (move[0][1] - 1)) or    # Target is n-1 (same as swapping with n-1)
+                    (move[1][1] == (move[0][1] + 1)) or    # Target is n+1 (does nothing)
+                    (move[1][1] == (move[0][1] + 2))       # Target is n+2 (same as swapping)
                 )
-             )
+            )
         ]
         
         # Return instances
         return [MoveMove(move) for move in moves]
 
+    # IS MOVED
+    def is_moved(self, mi, qi):
+        # Only the desination
+        return (mi, qi) == self.b
     
 
 # Swaps the queue of two machines.
@@ -196,6 +206,7 @@ class SwapQueuesMove(Move):
         new.calc_queue_cost_from(self.machine_b, 0)
         
         # Return swapped copy
+        new.move = self # This may be controversial
         return new
     
     
@@ -203,25 +214,141 @@ class SwapQueuesMove(Move):
     def get_moves(schedule: Schedule):
         
         # Return all 2-item combinations of the machine ID's
-        return [SwapQueuesMove(move) for move in list(iter.combinations(schedule.PS.machine_ids, 2))]
+        return [SwapQueuesMove(move) for move in list(iter.combinations(schedule.ps.machine_ids, 2))]
     
-
-
-def get_moves(schedule: Schedule) -> list[Move]:
+    # IS MOVED
+    def is_moved(self, mi, _):
+        # All orders in any of the two queues in question
+        return mi in [self.machine_a, self.machine_b]
+    
+# Swaps two batches (sequences of orders of the same color).
+class SwapBatchMove(Move):
+    
+    #
+    def __init__(self, b1: tuple[int, slice], b2: tuple[int, slice]):
+        # Batch-index: solution-specific
+        self.m1, self.slice1 = b1
+        self.m2, self.slice2 = b2
+    
+    # STR
+    def __str__(self):
+        return f'bswp: ({self.m1},[{self.slice1.start},{self.slice1.stop}]) => ({self.m2},[{self.slice2.start},{self.slice2.stop}])'
+    
+    #
+    def get_moved(self, old: Schedule) -> Schedule:
         
+        # Create copy of schedule
+        new = old.get_copy()
+        
+        # Apply swap
+        # If they are one the same machine, apply them back-to-front
+        if self.m1 == self.m2:
+            queue = old[self.m1,:]
+            
+            # If slice1 is after slice 2:
+            if self.slice1.indices(len(queue))[0] > self.slice2.indices(len(queue))[0]:
+                new[self.m1, self.slice1] = old[self.m1, self.slice2]
+                new[self.m1, self.slice2] = old[self.m1, self.slice1]
+                new.calc_queue_cost_from(self.m1, self.slice2.indices(len(queue))[0])
+            # Other way around
+            else:
+                new[self.m1, self.slice2] = old[self.m1, self.slice1]
+                new[self.m1, self.slice1] = old[self.m1, self.slice2]
+                new.calc_queue_cost_from(self.m1, self.slice1.indices(len(queue))[0])
+        else:
+            new[self.m1, self.slice1] = old[self.m2, self.slice2]
+            new[self.m2, self.slice2] = old[self.m1, self.slice1]
+            new.calc_queue_cost_from(self.m1, self.slice1.indices(len(old[self.m1,:]))[0])
+            new.calc_queue_cost_from(self.m2, self.slice2.indices(len(old[self.m2,:]))[0])
+        
+        # Return
+        new.move = self # This may be controversial
+        return new
+                
+    @staticmethod    
+    def get_batches(s: Schedule) -> list[tuple[int, slice]]:
+         
+        batches = []
+        for mi, queue in enumerate(s[:,:]): 
+            # Determine start and end of batches
+            # For each order in q1
+            qi = 0
+            bi = 0
+            
+            while (qi + 1) < len(queue):
+                
+                # Get size of this batch
+                batch_len = 1
+                # While next index in list and next index has no setup time from previous
+                while ((qi + batch_len < len(queue)) and (s.ps.get_setup_time(queue[qi + batch_len - 1], queue[qi + batch_len]) == 0)):
+                    batch_len += 1
+                
+                # Skip if single
+                if batch_len == 1:
+                    qi = qi + batch_len
+                    continue
+                
+                # Add batch to list
+                batches += [(mi, slice(qi, qi+batch_len))]
+                
+                # Skip to next batch
+                bi += 1
+                qi = qi + batch_len
+
+        # Return
+        return batches
+                
+    @staticmethod
+    def get_moves(schedule: Schedule):
+        
+        batches = SwapBatchMove.get_batches(schedule)
+        permed_batches = list(iter.combinations(batches, 2))
+        
+        # Return all 2-item combinations of the machine ID's
+        
+        
+        return [SwapBatchMove(batches[0], batches[1]) for batches in permed_batches]    
+    
+    # IS MOVED
+    def is_moved(self, mi, qi):
+        
+        # If on one of the affected queues:
+        if mi in [self.m1, self.m2]:
+            
+            # Special case where m1 == m2
+            if (self.m1 == self.m2):
+                return (
+                    ( # Between slice.start and slice1.start + slice2.lenght
+                        (qi >= self.slice1.start) and 
+                        (qi < (self.slice2.stop - self.slice2.start + self.slice1.start))
+                    ) or
+                    (
+                        (qi >= self.slice2.start) and 
+                        (qi < (self.slice1.stop - self.slice1.start + self.slice2.start))
+                    )
+                )
+                
+            # If mi is m1
+            if mi == self.m1:
+                return (
+                    (qi >= self.slice1.start) and 
+                    (qi < (self.slice2.stop - self.slice2.start + self.slice1.start))
+                )
+            
+            # mi is m2
+            return (
+                (qi >= self.slice2.start) and 
+                (qi < (self.slice1.stop - self.slice1.start + self.slice2.start))
+            )
+            
+
+def get_moves(schedule: Schedule) -> list[Move]: 
+            
     return [
         *SwapMove.get_moves(schedule),
         *MoveMove.get_moves(schedule),
-        *SwapQueuesMove.get_moves()
-    ]
-
-
-def get_moves(schedule: Schedule) -> list[Move]:
-        
-    return [
-        *SwapMove.get_moves(schedule),
-        *MoveMove.get_moves(schedule),
-        *SwapQueuesMove.get_moves(schedule)
+        *SwapQueuesMove.get_moves(schedule),
+        *SwapBatchMove.get_moves(schedule)
     ]
 
 # ???

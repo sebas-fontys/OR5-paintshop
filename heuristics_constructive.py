@@ -24,7 +24,7 @@ class ConstructiveHeuristic(ABC):
     name: str
     
     @abstractmethod
-    def get_schedule(verbosity: 0|1 = 0) -> Schedule:
+    def generate(verbosity: 0|1 = 0) -> Schedule:
         pass
 
 # BASIC
@@ -37,7 +37,7 @@ class Simple(ConstructiveHeuristic):
     name = "Simple"
     
     # @staticmethod
-    def get_schedule(self, verbosity: 0|1 = 0) -> Schedule:
+    def generate(self, verbosity: 0|1 = 0) -> Schedule:
         
         # Construct an empty schedule.
         schedule = Schedule()
@@ -78,7 +78,7 @@ class Greedy(ConstructiveHeuristic):
     name = "Greedy"
     
     # @staticmethod
-    def get_schedule(self, verbosity: 0|1 = 0) -> Schedule:
+    def generate(self, verbosity: 0|1 = 0) -> Schedule:
         
         # Construct an empty schedule.
         schedule = Schedule()
@@ -114,7 +114,7 @@ class Random(ConstructiveHeuristic):
     name = "Random"
     
     # @staticmethod
-    def get_schedule(self, verbosity: 0|1 = 0, i = 0) -> Schedule:
+    def generate(self, verbosity: 0|1 = 0, i = 0) -> Schedule:
         """Generates a random schedule, with an equal probability for all possible schedules.
 
         Args:
@@ -149,7 +149,7 @@ class ConstructiveHeuristics:
     def __init__(self, PS: PaintShop):
         self.PS = PS
     
-        self.simple = Simple(self.PS)
-        self.greedy = Greedy(self.PS)
-        self.random = Random(self.PS)
+        self.simple: Simple = Simple(self.PS)
+        self.greedy: Greedy = Greedy(self.PS)
+        self.random: Random = Random(self.PS)
         self.all: list[ConstructiveHeuristic] = [self.simple, self.greedy, self.random]

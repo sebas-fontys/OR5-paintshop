@@ -3,6 +3,15 @@ import copy
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.patches as mpatches
+from text_decoration import BACKGROUND_BLACK, BOLD, TEXT_GREEN, TEXT_RED, TEXT_YELLOW, UNDERLINE, ColorDecoration, decorate
+
+# To avoid circular imports
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from move import Move
+else:
+    class Move:
+        pass
 
 
 # Initialize PaintShop
@@ -10,15 +19,7 @@ from paintshop import PaintShop
 # PS = PaintShop()
 
 
-# Utility funcions
-def to_red(string: str) -> str:
-    return f"\x1b[31m{string}\x1b[0m"
 
-def to_green(string: str) -> str:
-    return f"\x1b[32m{string}\x1b[0m"
-
-def to_yellow(string: str) -> str:
-    return f"\x1b[33m{string}\x1b[0m"
 
 
 # SCHEDULE CLASS:
@@ -34,28 +35,29 @@ class Schedule:
     """
     
     # CONSTRUCTOR
-    def __init__(self, PS: PaintShop):
+    def __init__(self, ps: PaintShop, move: Move = None):
         
-        self.PS = PS
+        self.ps = ps
+        self.move = move
         
         """Constructs an empty schedule."""
         self.__queues: list[list[int]] = [
-            [] for _ in PS.machine_ids
+            [] for _ in ps.machine_ids
         ]
         
         # The time at which the orders are completed by their queue-index.
         self.__completion_times: dict[tuple[int, int], float] = {
-            (mi, -1): 0 for mi in PS.machine_ids
+            (mi, -1): 0 for mi in ps.machine_ids
         }
         
         # The penalty of the orders by their queue-index.
         self.__cumulative_penalties: dict[tuple[int, int], float] = {
-            (mi, -1): 0 for mi in PS.machine_ids
+            (mi, -1): 0 for mi in ps.machine_ids
         }
         
         # Penalties by queue
         self.queue_costs: list[float] = [
-            0 for _ in PS.machine_ids
+            0 for _ in ps.machine_ids
         ]
         
     # EQUALITY OPERATOR
@@ -106,43 +108,54 @@ class Schedule:
         del self.__queues[index[0]][index[1]]
         
     # STRING CONVERSION
-    def __str__(self) -> str:
+    def __str__(self, show_move = True) -> str:
         
         # Determine machine strings
-        machine_strings = [f'M{machine_id + 1}: ' for machine_id in self.PS.machine_ids]
+        machine_strings = [f'M{machine_id + 1}: ' for machine_id in self.ps.machine_ids]
         longest_ms = max([len(ms) for ms in machine_strings])
         machine_strings_justed = [
             f'{ms.ljust(longest_ms)}' for ms in machine_strings
         ]
         
         # Determine queue strings
-        longest_order_id = len(str(max(self.PS.order_ids)))
+        longest_order_id = len(str(max(self.ps.order_ids)))
         longest_queue = max([len(queue) for queue in self.__queues])
-        queue_strings_basic = [[str(id).rjust(longest_order_id) for id in queue] for queue in self.__queues]
-        queue_string_lengths = [len('  '.join(qs)) for qs in queue_strings_basic]
+        queue_strings_basic = [[f" {str(id).rjust(longest_order_id)} " for id in queue] for queue in self.__queues]
+        queue_string_lengths = [len(''.join(qs)) for qs in queue_strings_basic]
         
-        queue_strings_colored = [
-            '  '.join([
-                (
-                    to_red(str)
-                    if (
-                        # (qi > 0) &
-                        (self.__cumulative_penalties[(mi,qi)] > self.__cumulative_penalties[(mi,qi - 1)])
-                    ) else 
-                    to_green(str)
-                ) for qi, str in enumerate(queue)
+        # Function for decoration order
+        def decorate_order(mi: int, qi: int, o: str) -> str:
+            decorations: list[ColorDecoration] = []
+            
+            # Text red if penalty
+            if (self.__cumulative_penalties[(mi,qi)] > self.__cumulative_penalties[(mi,qi - 1)]):
+                decorations.append(TEXT_RED)
+            else:
+                decorations.append(TEXT_GREEN)
+                
+            # Backgroud gray if moved
+            if show_move and (self.move is not None):
+                if self.move.is_moved(mi, qi):
+                    decorations += [BACKGROUND_BLACK]
+            
+            # Return with decorations applied
+            return decorate(o, decorations)
+        
+        queue_strings_decorated = [
+            ''.join([
+                decorate_order(mi, qi, str) for qi, str in enumerate(queue)
             ]) for mi, queue in enumerate(queue_strings_basic)
         ]
         # longest_qs = max([len(qs) for qs in queue_strings])
         longest_queue_string_len = max(queue_string_lengths)
         
         queue_strings_justed = [
-            f'| {qs + " "*(longest_queue_string_len - queue_string_lengths[mi])}  |' for mi, qs in enumerate(queue_strings_colored)
+            f'|{qs + " "*(longest_queue_string_len - queue_string_lengths[mi])}|' for mi, qs in enumerate(queue_strings_decorated)
         ]
         
         # Determine cost strings
         cost_strings = [
-            f' {self.queue_costs[machine_id]:.2f}' for machine_id in self.PS.machine_ids
+            f' {self.queue_costs[machine_id]:.2f}' for machine_id in self.ps.machine_ids
         ]
         longest_cs = max([len(cs) for cs in cost_strings])
         cost_strings_justed = [
@@ -151,24 +164,23 @@ class Schedule:
         
         # Determine cost % strings
         cost_fracs = [
-            (f' ({(self.queue_costs[machine_id] / self.cost * 100):.0f}%)' if self.cost > 0 else '') for machine_id in self.PS.machine_ids
+            (f' ({(self.queue_costs[machine_id] / self.cost * 100):.0f}%)' if self.cost > 0 else '') for machine_id in self.ps.machine_ids
         ]
         
         # Determine header
         longest_queue = max([len(q) for q in self.__queues])    
-        header = f'{" "*longest_ms}| {"  ".join([str(i).rjust(longest_order_id) for i in range(longest_queue)])}  | {to_yellow(f"{self.cost:.2f}")} {"✔" if self.is_feasible() else "✘"}'
+        header = f'{" "*longest_ms}| {"  ".join([str(i).rjust(longest_order_id) for i in range(longest_queue)])} | {decorate(f"{self.cost:.2f}", [TEXT_YELLOW])} {"✔" if self.is_feasible() else "✘"}'
         # footer = f'{"Total cost:".ljust(longest_ms + longest_qs + 4)} {self.get_cost():.2f}'
         
         return '\n'.join([
             header,
-            '\n'.join([machine_strings_justed[i] + queue_strings_justed[i] + cost_strings_justed[i] + cost_fracs[i] for i in self.PS.machine_ids]),
+            '\n'.join([machine_strings_justed[i] + queue_strings_justed[i] + cost_strings_justed[i] + cost_fracs[i] for i in self.ps.machine_ids]),
             # footer
         ])
 
-    
     # COST CALCULATION
     def calc_cost(self):
-        for mi in self.PS.machine_ids:
+        for mi in self.ps.machine_ids:
             self.calc_queue_cost_from(mi, 0)
     
     # OPTIMISED COST CALCULATION
@@ -190,11 +202,11 @@ class Schedule:
             order = self.__queues[machine][qi]
             
             # Get and set completion time
-            t_done = t_start + self.PS.get_processing_time(order, machine) + self.PS.get_setup_time(order_prev, order)
+            t_done = t_start + self.ps.get_processing_time(order, machine) + self.ps.get_setup_time(order_prev, order)
             self.__completion_times[(machine, qi)] = t_done
             
             # Calculate and set cumulative penalty
-            cumulative_penalty = cumulative_penalty_prev + self.PS.get_penalty(order, t_done)
+            cumulative_penalty = cumulative_penalty_prev + self.ps.get_penalty(order, t_done)
             self.__cumulative_penalties[(machine, qi)] = cumulative_penalty
             cumulative_penalty_prev = cumulative_penalty
             
@@ -210,23 +222,23 @@ class Schedule:
             
     # FEASABILITY CHECK
     def is_feasible(self) -> bool:
-        return set(self.PS.order_ids) == set(oi for queue in self[:,:] for oi in queue)
+        return set(self.ps.order_ids) == set(oi for queue in self[:,:] for oi in queue)
     
     
     # PLOT USING PYPLOT
-    def plot(self) -> None:
+    def plot(self, legend = False) -> None:
         
         # Get machine order execution start times and durations
         # machine_schedules = self.get_machine_schedules()
         
         # Determine schedule end-time
-        schedule_completion_time = max([self.get_completion_time(mi) for mi in self.PS.machine_ids])
+        schedule_completion_time = max([self.get_completion_time(mi) for mi in self.ps.machine_ids])
         
         # Declaring a figure "gnt"
-        fig = plt.figure(figsize = (20,5))
+        fig = plt.figure(figsize = (30,6))
         
         # Iterate over machines
-        for mi in self.PS.machine_ids[::-1]:
+        for mi in self.ps.machine_ids:
             
             # Plot dividing line above current machine schedule
             if mi != 0:
@@ -240,7 +252,7 @@ class Schedule:
             oi: int
             for qi, oi in enumerate(self[mi, :]):
                 
-                processing_time = self.PS.get_processing_time(oi, mi)
+                processing_time = self.ps.get_processing_time(oi, mi)
                 
                 # Add rectangle representing the job
                 plt.gca().add_patch(
@@ -252,7 +264,7 @@ class Schedule:
                         processing_time, 
                         0.8,
                         fill = True, 
-                        facecolor = self.PS.get_order_color_name(oi),
+                        facecolor = self.ps.get_order_color_name(oi),
                         # edgecolor = 'red' if (job["cost"] > 0) else 'black',
                         edgecolor = 'black'
                         # linewith = 1
@@ -271,19 +283,20 @@ class Schedule:
         
         # Graph decoration
         plt.title(f"Schedule. Duration: {schedule_completion_time:.0f}. Cost: {self.cost:.0f}")
-        plt.ylim(-0.5, len(PS.machine_ids) - 0.5)
+        plt.ylim(self.ps.machine_count - 0.5, -0.5)
         plt.xlim(0, schedule_completion_time)
-        plt.yticks(self.PS.machine_ids, [f"M{id+1}" for id in self.PS.machine_ids])
+        plt.yticks(self.ps.machine_ids, [f"M{id+1}" for id in self.ps.machine_ids])
         plt.xlabel(f"Elapsed time units since start of schedule execution.")
         
         # Compose custom legend
         colors_patches = [
-            mpatches.Patch(color=c, label=c) for c in self.PS.get_color_names()
+            mpatches.Patch(color=c, label=c) for c in self.ps.get_color_names()
         ]
-        plt.legend(
-            handles = colors_patches,
-            title = "Paint colors"
-        )
+        if legend:
+            plt.legend(
+                handles = colors_patches,
+                title = "Paint colors"
+            )
         # plt.grid()
         
         # Show graph

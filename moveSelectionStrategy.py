@@ -68,7 +68,7 @@ class First(MoveSelectionStrategy):
 
 
 # RANDOM
-class Random(MoveSelectionStrategy):
+class RandomFirst(MoveSelectionStrategy):
     
     name: str = 'random'
     name_display = 'Random move'
@@ -127,11 +127,11 @@ class Best(MoveSelectionStrategy):
 # Not sure if and why this is neccessary
 MoveSelectionStrategy.register(First)
 MoveSelectionStrategy.register(Best)
-MoveSelectionStrategy.register(Random)
+MoveSelectionStrategy.register(RandomFirst)
 
 
 class MoveSelectionStrategies:
     first  = First
     best   = Best
-    random = Random
+    random = RandomFirst
     all: list[MoveSelectionStrategy] = [first, best, random]
