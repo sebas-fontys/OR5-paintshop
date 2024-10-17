@@ -342,12 +342,21 @@ class SwapBatchMove(Move):
             )
             
 
+move_cache = {}
 def get_moves(schedule: Schedule) -> list[Move]: 
-            
+    
+    cache_key = tuple(len(queue) for queue in schedule[:,:])
+    if cache_key in move_cache:
+        cache_moves = move_cache[cache_key]
+    else:
+        cache_moves = [
+            *SwapMove.get_moves(schedule),
+            *MoveMove.get_moves(schedule),
+            *SwapQueuesMove.get_moves(schedule)
+        ]
+        
     return [
-        *SwapMove.get_moves(schedule),
-        *MoveMove.get_moves(schedule),
-        *SwapQueuesMove.get_moves(schedule),
+        *cache_moves,
         *SwapBatchMove.get_moves(schedule)
     ]
 

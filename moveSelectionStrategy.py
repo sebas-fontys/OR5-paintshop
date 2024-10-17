@@ -78,6 +78,12 @@ class RandomFirst(MoveSelectionStrategy):
         
         # Get shuffled list of moves
         moves: list[Move] = get_moves(schedule)
+        
+        # Optimisation?
+        if solution_allow_criteria is None:
+            move = moves[rng.randint(0, len(moves) - 1)]
+            return (move, move.get_moved(schedule))
+        
         rng.shuffle(moves)
         
         # DEBUG
@@ -118,14 +124,18 @@ class Best(MoveSelectionStrategy):
         if solution_allow_criteria is not None:
             moves = [move for move in moves if solution_allow_criteria(move[1])]
         
-        # Return best allowed move (first by cost ascending)
-        return sorted(
-            moves,
-            key = lambda move: move[1].cost
-        )[0]
-    
+        if len(moves) > 0:
+        
+            # Return best allowed move (first by cost ascending)
+            return sorted(
+                moves,
+                key = lambda move: move[1].cost
+            )[0]
+            
+        return (None, schedule)
+        
 # Not sure if and why this is neccessary
-MoveSelectionStrategy.register(First)
+MoveSelectionStrategy.register(First)()
 MoveSelectionStrategy.register(Best)
 MoveSelectionStrategy.register(RandomFirst)
 
