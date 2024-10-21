@@ -26,12 +26,19 @@ class ConstructiveHeuristic(ABC):
     @abstractmethod
     def generate(verbosity: 0|1 = 0) -> Schedule:
         pass
+    
+    @abstractmethod
+    def __str__(self):
+        pass
 
 # BASIC
 class Simple(ConstructiveHeuristic):
     
     def __init__(self, PS: PaintShop):
         self.PS = PS
+    
+    def __str__(self):
+        return self.name
     
     # STATIC
     name = "Simple"
@@ -74,6 +81,9 @@ class Greedy(ConstructiveHeuristic):
     def __init__(self, PS: PaintShop):
         self.PS = PS
     
+    def __str__(self):
+        return self.name
+    
     # STATIC
     name = "Greedy"
     
@@ -105,10 +115,13 @@ class Greedy(ConstructiveHeuristic):
     
 
 # RANDOM
-class Random(ConstructiveHeuristic):    
+class Random(ConstructiveHeuristic):
     
     def __init__(self, PS: PaintShop):
         self.PS = PS
+    
+    def __str__(self):
+        return self.name
     
     # STATIC
     name = "Random"

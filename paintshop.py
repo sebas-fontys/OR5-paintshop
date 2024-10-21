@@ -114,7 +114,6 @@ class PaintShop:
         return self.__setup_times.loc[order_old, order_new]
     
     def get_penalty(self, order, t_done) -> float:
-        
         return self.orders.loc[order, 'penalty'] * max(
             0, 
             t_done - self.orders.loc[order, 'deadline']

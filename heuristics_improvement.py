@@ -5,8 +5,8 @@ import random as rng
 import numpy as np
 from abc import ABC, abstractmethod
 import time
-from heuristics_constructive import ConstructiveHeuristic
-from move import Move
+from heuristics_constructive import ConstructiveHeuristic, Random
+from move import GenerateNew, Move
 from schedule import Schedule
 from time import time
 from moveSelectionStrategy import MoveSelectionStrategies, MoveSelectionStrategy
@@ -32,6 +32,7 @@ class HeuristicRunData:
         self.iterations: list[HeuristicIterationData] = [        # Iterations made
             HeuristicIterationData(0, None, initial.cost)
         ]
+        self.time = 0
 
 
 
@@ -47,7 +48,7 @@ class ImprovementHeuristic(ABC):
 
     # 
     @abstractmethod
-    def run(self, initial: Schedule, verbosity: 0|1|2 = 2) -> HeuristicRunData:
+    def run(self, run_data: HeuristicRunData, verbosity: 0|1|2 = 2) -> HeuristicRunData:
         """Determine the move to make according to the heuristic.
 
         Returns:
@@ -62,20 +63,24 @@ class ImprovementHeuristic(ABC):
         pass
     
     @abstractmethod
-    def run_timed(self, run_data: HeuristicRunData, t_max, verbosity: 0|1|2 = 2, t0 = time()) -> HeuristicRunData:
+    def run_timed(self, run_data: HeuristicRunData, t0, t_max, verbosity: 0|1|2 = 2) -> HeuristicRunData:
         pass
     
     @staticmethod
-    def print_iteration(iteration: int, time: float, last_cost: int, best_cost: int, verbosity: int, move: Move, schedule: Schedule):
+    def print_iteration(base_message: str, iteration: int, time: float, last_cost: int, best_cost: int, verbosity: int, move: Move, schedule: Schedule):
         # Print if verbose
         if verbosity > 0:
             if verbosity > 1:
                 print("")
             improvement = (last_cost is not None) and (last_cost > schedule.cost)
             change_color = (YELLOW if schedule.cost < best_cost else GREEN) if improvement else RED
-            print(f"""[{time:.1f}] {
+            print(f"""[{
+                    base_message
+                }] [{time:.1f}] {
                     iteration
-                }: [{decorate(f'{schedule.cost:.0f}', [ColorDecoration(DecorationTypes.TEXT, change_color)])}] {
+                }: [{
+                    decorate(f'{schedule.cost:.0f}', [ColorDecoration(DecorationTypes.TEXT, change_color)])
+                }] {
                     move
                 }""")
             if verbosity > 1:
@@ -97,26 +102,88 @@ class Basic(ImprovementHeuristic):
         return "_".join([
             Basic.name,
             self.strategy.name,
-        ])    
-    
-    #
-    def run(self, schedule: Schedule, verbosity: 0|1|2 = 2, t0 = time(), t_max = None) -> HeuristicRunData:
-                
-        # Create run data object
-        run_data = HeuristicRunData(self, schedule)
+        ])   
+        
+        
+    def run_timed(self, run_data: HeuristicRunData, t0, t_max, verbosity: 0|1|2 = 2):
+        
+        # Generator in the case that a local optimum is found but time is not up
+        generator = GenerateNew(Random)
         
         # Loop until termination
         while True:
             
             # Define criteria
-            def criteria(s: Schedule):
-                return s.cost < schedule.cost
+            def must_improve(s: Schedule):
+                return s.cost < run_data.last.cost
+                        
+            # Get move according to the move selection strategy and the criteria
+            move, moved = self.strategy.try_get_move(
+                run_data.last, 
+                must_improve
+            )
+            
+            # If no improving move found: generate new start
+            if move is None:
+                move, moved = (generator, generator.get_moved(run_data.last))
+            
+            # Break if time limit exceeded
+            move_time = time() - t0
+            if move_time > t_max:
+                if verbosity > 0:
+                    print(decorate("Time limit reached.", [TEXT_RED]))
+                break
+            
+            # Make move
+            run_data.last = moved
+            
+            # Print if verbose
+            ImprovementHeuristic.print_iteration(
+                str(self),
+                len(run_data.iterations), 
+                move_time,
+                run_data.iterations[-1].cost, 
+                run_data.best.cost, 
+                verbosity, 
+                move, 
+                run_data.last
+            )
+            
+            # Log
+            iteration_data = HeuristicIterationData(
+                move_time,
+                move,
+                run_data.last.cost
+            )
+            run_data.iterations.append(iteration_data)
+            
+            # If improving move found:
+            if run_data.last.cost < run_data.best.cost:
+                run_data.best = run_data.last
+        
+        # Return
+        run_data.time = time() - t0
+        return run_data 
+    
+    #
+    def run(self, run_data: HeuristicRunData, verbosity: 0|1|2 = 2) -> HeuristicRunData:
+        
+        t0 = time()
+        
+        # Loop until termination
+        while True:
+            
+            # Define criteria
+            def must_improve(s: Schedule):
+                return s.cost < run_data.last.cost
                         
             # Get move according to the move selection strategy and the criteria
             move, moved_schedule = self.strategy.try_get_move(
-                schedule, 
-                criteria
+                run_data.last, 
+                must_improve
             )
+            
+            move_time = time() - t0
             
             # Break if optimum reached
             if move is None:
@@ -124,41 +191,31 @@ class Basic(ImprovementHeuristic):
                     print(decorate("Optimum reached.", [TEXT_GREEN]))
                 break
             else:
-                schedule = moved_schedule
-            
-            # Break if time limit exceeded
-            if (t_max is not None) and ((time() - t0) > t_max):
-                if verbosity > 0:
-                    print(decorate("Time limit reached.", [TEXT_RED]))
-                break
-            
-            # Print if verbose
+                run_data.last = moved_schedule
+                        
+            # Print log
             ImprovementHeuristic.print_iteration(
+                str(self),
                 len(run_data.iterations), 
-                time() - t0,
+                move_time,
                 run_data.iterations[-1].cost, 
                 run_data.best.cost, 
                 verbosity, 
                 move, 
-                schedule
+                run_data.last
             )
             
             # Add iteration data
-            iteration_data = HeuristicIterationData(
-                time() - t0,
+            run_data.iterations.append(HeuristicIterationData(
+                move_time,
                 move,
-                schedule.cost
-            )
-            run_data.iterations.append(iteration_data)
+                run_data.last.cost
+            ))
             
-            
-        # Return last solution (will allways be best)
-        run_data.best = schedule
-        run_data.last = schedule
+            run_data.best = run_data.last
+        
+        run_data.time = time() - t0
         return run_data
-
-    def run_timed(self, run_data: HeuristicRunData, t_max, verbosity: 0|1|2 = 2, t0 = time()) -> HeuristicRunData:
-        pass
 
 # TABOO SEARCH (allow non-improving moves but keep a blacklist of previous solutions)
 class Taboo(ImprovementHeuristic):
@@ -271,8 +328,88 @@ class Taboo(ImprovementHeuristic):
         run_data.last = schedule
         return run_data
     
-    def run_timed(self, run_data: HeuristicRunData, t_max, verbosity: 0|1|2 = 2, t0 = time()) -> HeuristicRunData:
-        pass
+    def run_timed(self, run_data: HeuristicRunData, t0, t_max, verbosity: 0|1|2 = 2) -> HeuristicRunData:
+        
+        taboo_set: set[str] = set()
+        
+        # Loop until termination
+        while run_data.iterations[-1].time < t_max:
+            
+            # Add current schedule to taboo set
+            taboo_set.add(hash(run_data.last))
+                        
+            # (Re)define criteria (should arguably be a lambda)
+            def criteria_improve(s: Schedule) -> bool:
+                return s.cost < run_data.last.cost
+            
+            # Try to get an improving move
+            move, moved = self.improvement_strategy.try_get_move(
+                run_data.last, 
+                criteria_improve
+            )
+            
+            # No improving move found: Do a non improving move that is not taboo
+            if move is None:
+                
+                # (Re)define criteria (should arguably be a lambda)
+                def criteria_nontaboo(schedule: Schedule) -> bool:
+                    return hash(schedule) not in taboo_set
+
+                # Get best move accoring to strategy & taboo list
+                move, moved = self.non_improvement_strategy.try_get_move(
+                    run_data.last, 
+                    criteria_nontaboo
+                )
+            
+            # Break if no moved left
+            if move is None:
+                if verbosity > 0:
+                    if verbosity > 1:
+                        print("")
+                    print(decorate("Optimum reached.", [TEXT_GREEN]))
+                break
+            
+            move_time = time() - t0
+            
+            # Break if time limit exceeded
+            if move_time > t_max:
+                if verbosity > 0:
+                    print(decorate("Time limit reached.", [TEXT_RED]))
+                break
+            
+            # Set schedule to new schedule
+            run_data.last = moved
+            
+            # Print if verbose
+            ImprovementHeuristic.print_iteration(
+                str(self),
+                len(run_data.iterations), 
+                move_time,
+                run_data.iterations[-1].cost, 
+                run_data.best.cost, 
+                verbosity, 
+                move, 
+                run_data.last
+            )
+            
+            # Append iteration data
+            run_data.iterations.append(
+                HeuristicIterationData(
+                    move_time,
+                    move,
+                    run_data.last.cost
+                )
+            )
+                        
+            # Update best if best
+            if run_data.last.cost < run_data.best.cost:
+                run_data.best = run_data.last
+            
+            
+            
+        # Return none because no improving feasible solution found
+        run_data.time = time() - t0
+        return run_data
    
 
 class Annealing(ImprovementHeuristic):
@@ -307,14 +444,15 @@ class Annealing(ImprovementHeuristic):
                 break
             
             # Determine if move is accepted
-            cost_delta = moved.cost - run_data.last
-            if (cost_delta < 0) or (rng.random() < np.exp(-(cost_delta / self.delta_factor)/temp)):
+            cost_delta = moved.cost - run_data.last.cost
+            if (cost_delta < 0) or (rng.random() < np.exp(-cost_delta/(temp * self.delta_factor))):
                 
                 # Make move
                 run_data.last = moved
                 
                 # Print move
                 ImprovementHeuristic.print_iteration(
+                    str(self),
                     i, 
                     t_move,
                     run_data.iterations[-1].cost, 
@@ -336,6 +474,7 @@ class Annealing(ImprovementHeuristic):
                     run_data.best = moved
                     
         # Return
+        run_data.time = time() - t0
         return run_data
                 
     def run(self, schedule: Schedule, iterations, verbosity: 0|1|2 = 2, t0 = time()) -> HeuristicRunData:
@@ -380,6 +519,7 @@ class Annealing(ImprovementHeuristic):
                 
                 # Print
                 ImprovementHeuristic.print_iteration(
+                    str(self),
                     i, 
                     t_move,
                     run_data.iterations[-1].cost, 

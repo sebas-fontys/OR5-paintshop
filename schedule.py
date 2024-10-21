@@ -228,6 +228,12 @@ class Schedule:
     # PLOT USING PYPLOT
     def plot(self, legend = False) -> None:
         
+        plt.rcParams["hatch.linewidth"] = 4
+        # setup_hatch = r"||"
+        setup_hatch = r"//"
+        setup_c1 = (0,0,0,0.3)
+        setup_c2 = 'white'
+        
         # Get machine order execution start times and durations
         # machine_schedules = self.get_machine_schedules()
         
@@ -253,27 +259,50 @@ class Schedule:
             for qi, oi in enumerate(self[mi, :]):
                 
                 processing_time = self.ps.get_processing_time(oi, mi)
+                completion_time = self.__completion_times[(mi, qi)]
+                
+                # Optionally draw setup time
+                if (qi > 0) and (self.ps.get_setup_time(self[mi, qi-1], oi) > 0):
+                    plt.gca().add_patch(
+                        patches.Rectangle(
+                            (
+                                self.__completion_times[(mi, qi-1)], 
+                                mi - 0.3
+                            ),
+                            self.ps.get_setup_time(self[mi, qi-1], oi),
+                            0.6,
+                            fill = True, 
+                            facecolor = setup_c1,
+                            edgecolor = setup_c2,
+                            # facecolor = self.ps.get_order_color_name(oi),
+                            # edgecolor = self.ps.get_order_color_name(self[mi, qi-1]),
+                            hatch=setup_hatch,
+                            zorder = -1
+                            # linewith = 1
+                        )
+                    )
                 
                 # Add rectangle representing the job
                 plt.gca().add_patch(
                     patches.Rectangle(
                         (
-                            self.__completion_times[(mi, qi)] - processing_time, 
+                            completion_time - processing_time, 
                             mi - 0.4
-                        ), 
-                        processing_time, 
+                        ),
+                        processing_time,
                         0.8,
                         fill = True, 
                         facecolor = self.ps.get_order_color_name(oi),
                         # edgecolor = 'red' if (job["cost"] > 0) else 'black',
-                        edgecolor = 'black'
+                        edgecolor = 'black',
+                        # alpha = 0.5
                         # linewith = 1
                     )
                 )
                 
                 # Add text to center of rectangle
                 plt.text(
-                    self.__completion_times[(mi, qi)] - processing_time / 2, 
+                    completion_time - processing_time / 2, 
                     mi,
                     f"O{oi + 1}",
                     # f"O{job['order'] + 1}\n\n{job['cost']:.0f}",
@@ -291,11 +320,13 @@ class Schedule:
         # Compose custom legend
         colors_patches = [
             mpatches.Patch(color=c, label=c) for c in self.ps.get_color_names()
+        ] + [
+            mpatches.Patch(facecolor=setup_c1, edgecolor = setup_c2, hatch = setup_hatch, label='Setup')
         ]
         if legend:
             plt.legend(
                 handles = colors_patches,
-                title = "Paint colors"
+                title = "Tasks"
             )
         # plt.grid()
         

@@ -23,7 +23,10 @@ def load(rel_file_path, verbose = True):
     
     total_path = path.join(CACHE_DIR, rel_file_path)
     
-    with open(total_path + ".pickle", "rb") as input_file:
+    if not total_path.endswith('.pickle'):
+        total_path += ".pickle"
+    
+    with open(total_path, "rb") as input_file:
         file = pickle.load(input_file)
     
     if verbose:

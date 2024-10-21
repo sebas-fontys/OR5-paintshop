@@ -2,8 +2,10 @@
 from abc import ABC, abstractmethod
 import itertools as iter
 
+from heuristics_constructive import ConstructiveHeuristic
 from schedule import Schedule
 from paintshop import PaintShop
+from typing import Type
 
 
 # CONSTANTS
@@ -340,7 +342,24 @@ class SwapBatchMove(Move):
                 (qi >= self.slice2.start) and 
                 (qi < (self.slice1.stop - self.slice1.start + self.slice2.start))
             )
-            
+
+# Special move that generates an entirely new schedule
+class GenerateNew(Move):
+    
+    def __init__(self, generator: Type[ConstructiveHeuristic]):
+        self.generator = generator
+        
+    def __str__(self):
+        return f'gnew: ({self.generator})'
+
+    def get_moved(self, schedule: Schedule):
+        return self.generator(schedule.ps).generate()
+    
+    def get_moves(schedule: Schedule):
+        pass
+    
+    def is_moved(self):
+        return True
 
 move_cache = {}
 def get_moves(schedule: Schedule) -> list[Move]: 
@@ -364,3 +383,4 @@ def get_moves(schedule: Schedule) -> list[Move]:
 Move.register(SwapMove)
 Move.register(MoveMove)
 Move.register(SwapQueuesMove)
+Move.register(SwapBatchMove)
